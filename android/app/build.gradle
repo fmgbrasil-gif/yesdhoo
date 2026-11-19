@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'br.com.yesdooh.player'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'br.com.yesdooh.player'
+        minSdk 21          // Android 5.0 em diante (cobre praticamente todo TV box)
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    // Para publicar atualizacoes, assine sempre com a MESMA chave. Informe-a em ~/.gradle/gradle.properties:
+    //   YESDOOH_STORE_FILE, YESDOOH_STORE_PASSWORD, YESDOOH_KEY_ALIAS, YESDOOH_KEY_PASSWORD
+    signingConfigs {
+        release {
+            if (project.hasProperty('YESDOOH_STORE_FILE')) {
+                storeFile file(YESDOOH_STORE_FILE)
+                storePassword YESDOOH_STORE_PASSWORD
+                keyAlias YESDOOH_KEY_ALIAS
+                keyPassword YESDOOH_KEY_PASSWORD
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (project.hasProperty('YESDOOH_STORE_FILE')) signingConfig signingConfigs.release
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    lint { abortOnError false }
+}

@@ -6,3 +6,9 @@ storage/*
 !storage/.gitkeep
 *.tsbuildinfo
 next-env.d.ts
+
+# versao PHP: banco, cache e midias enviadas
+php/data/*
+!php/data/.htaccess
+php/uploads/*
+!php/uploads/.htaccess

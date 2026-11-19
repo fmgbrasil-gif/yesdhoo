@@ -1,0 +1,10 @@
+# /player abre o player (mesmo endereco usado pelo aplicativo Android)
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^player/?$ player.php [L,QSA]
+RewriteRule ^sw\.js$ - [L]
+</IfModule>
+Options -Indexes
+<FilesMatch "^lib\.php$">
+  Require all denied
+</FilesMatch>

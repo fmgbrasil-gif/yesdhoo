@@ -14,8 +14,8 @@ type Current = { media: PlayerMedia; n: number } | null;
 
 const LS = { token: 'yd-player-token', data: 'yd-player-data', rotate: 'yd-player-rotate', executed: 'yd-player-executed' };
 const CACHE = 'yd-media-v1';
-const full: CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%' };
-const center: CSSProperties = { ...full, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '6cqmin', gap: '3cqmin' };
+const full: CSSProperties = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' };
+const center: CSSProperties = { ...full, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 'calc(var(--u) * 6)', gap: 'calc(var(--u) * 3)' };
 
 /** Data, hora e dia da semana no fuso da tela. */
 function nowIn(tz: string) {
@@ -95,26 +95,26 @@ function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; a
   const color = String(cfg.textColor ?? cfg.color ?? '#ffffff');
   const image = typeof cfg.image === 'string' ? `/api/arquivos/${cfg.image}` : null;
   const base: CSSProperties = { ...center, background: bg, color };
-  const big: CSSProperties = { fontSize: '13cqmin', fontWeight: 900, lineHeight: 1 };
-  const label: CSSProperties = { fontSize: '4cqmin', opacity: 0.85 };
+  const big: CSSProperties = { fontSize: 'calc(var(--u) * 13)', fontWeight: 900, lineHeight: 1 };
+  const label: CSSProperties = { fontSize: 'calc(var(--u) * 4)', opacity: 0.85 };
   if (needsData && !data) return <div style={{ ...full, background: bg }} />;
 
   if (media.type === 'aviso') {
     const scale = cfg.fontSize === 'pequena' ? 0.8 : cfg.fontSize === 'grande' ? 1.25 : 1;
     return (
       <div style={base}>
-        {image && <img src={image} alt="" style={{ maxHeight: '26cqh', maxWidth: '50cqw', objectFit: 'contain' }} />}{/* eslint-disable-line @next/next/no-img-element */}
-        {cfg.showTitle !== false && <p style={{ fontSize: `${8 * scale}cqmin`, fontWeight: 900, lineHeight: 1.1, color: String(cfg.titleColor ?? color) }}>{String(cfg.title ?? media.name)}</p>}
-        <p style={{ fontSize: `${4.6 * scale}cqmin`, lineHeight: 1.35, maxWidth: '85cqw', whiteSpace: 'pre-wrap' }}>{String(cfg.text ?? '')}</p>
+        {image && <img src={image} alt="" style={{ maxHeight: 'calc(var(--uh) * 26)', maxWidth: 'calc(var(--uw) * 50)', objectFit: 'contain' }} />}{/* eslint-disable-line @next/next/no-img-element */}
+        {cfg.showTitle !== false && <p style={{ fontSize: `calc(var(--u) * ${8 * scale})`, fontWeight: 900, lineHeight: 1.1, color: String(cfg.titleColor ?? color) }}>{String(cfg.title ?? media.name)}</p>}
+        <p style={{ fontSize: `calc(var(--u) * ${4.6 * scale})`, lineHeight: 1.35, maxWidth: 'calc(var(--uw) * 85)', whiteSpace: 'pre-wrap' }}>{String(cfg.text ?? '')}</p>
       </div>
     );
   }
   if (media.type === 'hora') {
     return (
       <div style={base}>
-        {image && <img src={image} alt="" style={{ maxHeight: '24cqh', objectFit: 'contain' }} />}{/* eslint-disable-line @next/next/no-img-element */}
+        {image && <img src={image} alt="" style={{ maxHeight: 'calc(var(--uh) * 24)', objectFit: 'contain' }} />}{/* eslint-disable-line @next/next/no-img-element */}
         <p style={label}>{new Intl.DateTimeFormat('pt-BR', { timeZone: tz, weekday: 'long', day: '2-digit', month: 'long' }).format(new Date())}</p>
-        <Clock tz={tz} style={{ ...big, fontSize: '24cqmin', fontVariantNumeric: 'tabular-nums' }} />
+        <Clock tz={tz} style={{ ...big, fontSize: 'calc(var(--u) * 24)', fontVariantNumeric: 'tabular-nums' }} />
       </div>
     );
   }
@@ -133,8 +133,8 @@ function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; a
     return (
       <div style={base}>
         <p style={label}>{d.city ? `Tempo agora em ${d.city}` : 'Tempo agora'}</p>
-        <p style={{ ...big, fontSize: '22cqmin' }}>{d.temp}°C</p>
-        <p style={{ fontSize: '5.5cqmin', fontWeight: 700 }}>{WEATHER[d.code] ?? 'Tempo instável'}</p>
+        <p style={{ ...big, fontSize: 'calc(var(--u) * 22)' }}>{d.temp}°C</p>
+        <p style={{ fontSize: 'calc(var(--u) * 5.5)', fontWeight: 700 }}>{WEATHER[d.code] ?? 'Tempo instável'}</p>
         <p style={label}>Máx. {d.max}° · Mín. {d.min}°</p>
       </div>
     );
@@ -145,10 +145,10 @@ function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; a
   return (
     <div style={{ ...full, background: bg, color, display: 'flex', flexDirection: 'column' }}>
       {item.image && <div style={{ flex: 1, minHeight: 0, backgroundImage: `url("${item.image}")`, backgroundSize: 'cover', backgroundPosition: 'center' }} />}
-      <div style={{ padding: '4cqmin 5cqmin', display: 'flex', flexDirection: 'column', gap: '1.5cqmin', ...(item.image ? {} : { flex: 1, justifyContent: 'center' }) }}>
-        <p style={{ fontSize: '3cqmin', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', opacity: 0.8 }}>{String(cfg.source || media.name)}</p>
-        <p style={{ fontSize: '6cqmin', fontWeight: 900, lineHeight: 1.12 }}>{item.title}</p>
-        {!item.image && <p style={{ fontSize: '3.6cqmin', opacity: 0.85 }}>{item.summary}</p>}
+      <div style={{ padding: 'calc(var(--u) * 4) calc(var(--u) * 5)', display: 'flex', flexDirection: 'column', gap: 'calc(var(--u) * 1.5)', ...(item.image ? {} : { flex: 1, justifyContent: 'center' }) }}>
+        <p style={{ fontSize: 'calc(var(--u) * 3)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', opacity: 0.8 }}>{String(cfg.source || media.name)}</p>
+        <p style={{ fontSize: 'calc(var(--u) * 6)', fontWeight: 900, lineHeight: 1.12 }}>{item.title}</p>
+        {!item.image && <p style={{ fontSize: 'calc(var(--u) * 3.6)', opacity: 0.85 }}>{item.summary}</p>}
       </div>
     </div>
   );
@@ -196,12 +196,12 @@ function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
   };
   return (
     <form onSubmit={submit} style={{ ...center, background: '#0b1120', color: '#fff' }}>
-      <p style={{ fontSize: '7cqmin', fontWeight: 900 }}>Yes<span style={{ color: '#f9c21a' }}>DOOH</span> Player</p>
-      <p style={{ fontSize: '3.2cqmin', opacity: 0.8, maxWidth: '80cqw' }}>Digite o código de pareamento exibido no painel, na página da tela.</p>
+      <p style={{ fontSize: 'calc(var(--u) * 7)', fontWeight: 900 }}>Yes<span style={{ color: '#f9c21a' }}>DOOH</span> Player</p>
+      <p style={{ fontSize: 'calc(var(--u) * 3.2)', opacity: 0.8, maxWidth: 'calc(var(--uw) * 80)' }}>Digite o código de pareamento exibido no painel, na página da tela.</p>
       <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} autoFocus aria-label="Código de pareamento" placeholder="ABC123" autoComplete="off"
-        style={{ fontSize: '9cqmin', fontFamily: 'monospace', fontWeight: 900, letterSpacing: '.3em', textAlign: 'center', width: '7em', maxWidth: '90cqw', padding: '.2em', borderRadius: '1cqmin', border: '3px solid #f9c21a', background: '#161d2e', color: '#fff', outline: 'none' }} />
-      <button disabled={busy || code.length !== 6} style={{ fontSize: '4cqmin', fontWeight: 800, padding: '.5em 1.6em', borderRadius: '1cqmin', background: '#f9c21a', color: '#0b1120', opacity: busy || code.length !== 6 ? 0.5 : 1 }}>{busy ? 'Pareando...' : 'Parear tela'}</button>
-      {error && <p role="alert" style={{ fontSize: '3cqmin', color: '#fca5a5', maxWidth: '80cqw' }}>{error}</p>}
+        style={{ fontSize: 'calc(var(--u) * 9)', fontFamily: 'monospace', fontWeight: 900, letterSpacing: '.3em', textAlign: 'center', width: '7em', maxWidth: 'calc(var(--uw) * 90)', padding: '.2em', borderRadius: 'calc(var(--u) * 1)', border: '3px solid #f9c21a', background: '#161d2e', color: '#fff', outline: 'none' }} />
+      <button disabled={busy || code.length !== 6} style={{ fontSize: 'calc(var(--u) * 4)', fontWeight: 800, padding: '.5em 1.6em', borderRadius: 'calc(var(--u) * 1)', background: '#f9c21a', color: '#0b1120', opacity: busy || code.length !== 6 ? 0.5 : 1 }}>{busy ? 'Pareando...' : 'Parear tela'}</button>
+      {error && <p role="alert" style={{ fontSize: 'calc(var(--u) * 3)', color: '#fca5a5', maxWidth: 'calc(var(--uw) * 80)' }}>{error}</p>}
     </form>
   );
 }
@@ -212,7 +212,7 @@ async function deviceInfo() {
   return {
     model: /Android[^;]*;\s*([^)]+?)\s*(Build|\))/.exec(ua)?.[1] ?? navigator.platform ?? 'Navegador',
     os: /(Android [\d.]+|Windows NT [\d.]+|Mac OS X [\d_]+|CrOS|Linux|Tizen [\d.]+|Web0S)/.exec(ua)?.[1] ?? 'Desconhecido',
-    app: `${/(Chrome|Firefox|Safari|Edg)\/[\d.]+/.exec(ua)?.[0] ?? 'Navegador'} · player web 1.0`,
+    app: /YesDoohPlayer\/[\d.]+/.test(ua) ? `App Android ${/YesDoohPlayer\/([\d.]+)/.exec(ua)![1]} · ${/Chrome\/[\d.]+/.exec(ua)?.[0] ?? 'WebView'}` : `${/(Chrome|Firefox|Safari|Edg)\/[\d.]+/.exec(ua)?.[0] ?? 'Navegador'} · player web`,
     resolution: `${screen.width}×${screen.height}`,
     storageUsed: est?.usage ?? 0,
   };
@@ -235,6 +235,8 @@ export default function Player() {
     const q = new URLSearchParams(location.search).get('girar');
     if (q) localStorage.setItem(LS.rotate, q);
     setRotate(Number(localStorage.getItem(LS.rotate)) || 0);
+    // guarda a propria pagina do player para ela abrir mesmo se o aparelho ligar sem internet
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
     setToken(localStorage.getItem(LS.token));
     try { const saved = localStorage.getItem(LS.data); if (saved) setSync(JSON.parse(saved)); } catch { /* playlist salva invalida */ }
   }, []);
@@ -310,17 +312,17 @@ export default function Player() {
       localStorage.setItem(LS.executed, '[]');
       setOffline(false);
       const j: { version: number; commands: { id: string; type: string }[] } = await r.json();
-      let reload = false, again = false;
+      let reload = false;
       for (const c of j.commands) {
         if (c.type === 'recarregar') reload = true;
         if (c.type === 'limpar_cache' && 'caches' in window) await caches.delete(CACHE);
-        if (c.type === 'screenshot') { capture(); again = true; }
+        if (c.type === 'screenshot') capture();
       }
       // confirma no proximo batimento (sobrevive ao recarregamento da pagina)
       if (j.commands.length) localStorage.setItem(LS.executed, JSON.stringify(j.commands.map((c) => c.id)));
       if (reload) { location.reload(); return; }
       if (j.commands.length || j.version !== syncRef.current?.version) await doSync();
-      if (again) setTimeout(beat, 1500); // envia a captura logo em seguida
+      if (j.commands.length) setTimeout(beat, 1500); // confirma a execucao (e envia a captura) logo em seguida
     } catch {
       for (const [k, v] of Object.entries(sent)) plays.current[k] = (plays.current[k] ?? 0) + v; // guarda para reenviar
       setOffline(true);
@@ -345,9 +347,18 @@ export default function Player() {
   useEffect(() => { if (cur) return; const t = setInterval(next, 15_000); return () => clearInterval(t); }, [cur, next]);
 
   const turned = rotate === 90 || rotate === 270;
+  // Unidades proporcionais ao quadro (1 = 1% do lado). Calculadas em JS para funcionar tambem em WebViews antigos de TV box.
+  const [size, setSize] = useState({ w: 1280, h: 720 });
+  useEffect(() => {
+    const fit = () => setSize(turned ? { w: innerHeight, h: innerWidth } : { w: innerWidth, h: innerHeight });
+    fit();
+    addEventListener('resize', fit);
+    return () => removeEventListener('resize', fit);
+  }, [turned]);
+  const unit = { '--u': `${Math.min(size.w, size.h) / 100}px`, '--uw': `${size.w / 100}px`, '--uh': `${size.h / 100}px` } as CSSProperties;
   const frame: CSSProperties = {
     position: 'fixed', top: '50%', left: '50%', width: turned ? '100vh' : '100vw', height: turned ? '100vw' : '100vh', transform: `translate(-50%, -50%) rotate(${rotate}deg)`,
-    background: '#000', color: '#fff', overflow: 'hidden', containerType: 'size', display: 'flex', flexDirection: 'column', cursor: token ? 'none' : 'auto', fontFamily: 'Inter, system-ui, sans-serif',
+    ...unit, background: '#000', color: '#fff', overflow: 'hidden', display: 'flex', flexDirection: 'column', cursor: token ? 'none' : 'auto', fontFamily: 'Inter, system-ui, sans-serif',
   };
   const footer = sync?.screen.footer;
 
@@ -358,18 +369,18 @@ export default function Player() {
           <div ref={stage} data-name={cur?.media.name ?? ''} style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             {cur && sync ? <Stage cur={cur} sync={sync} api={api} next={next} /> : (
               <div style={{ ...center, background: '#0b1120' }}>
-                <p style={{ fontSize: '6cqmin', fontWeight: 900 }}>Yes<span style={{ color: '#f9c21a' }}>DOOH</span></p>
-                <p style={{ fontSize: '3cqmin', opacity: 0.7 }}>{!sync ? 'Carregando programação...' : sync.slots.length ? 'Nenhum conteúdo programado para este horário.' : `${sync.screen.name}: adicione conteúdos à playlist no painel.`}</p>
+                <p style={{ fontSize: 'calc(var(--u) * 6)', fontWeight: 900 }}>Yes<span style={{ color: '#f9c21a' }}>DOOH</span></p>
+                <p style={{ fontSize: 'calc(var(--u) * 3)', opacity: 0.7 }}>{!sync ? 'Carregando programação...' : sync.slots.length ? 'Nenhum conteúdo programado para este horário.' : `${sync.screen.name}: adicione conteúdos à playlist no painel.`}</p>
               </div>
             )}
           </div>
           {footer && sync && (
-            <div style={{ background: footer.bg, color: footer.color, display: 'flex', alignItems: 'center', gap: '3cqmin', padding: '1.4cqmin 3cqmin', fontSize: '3.2cqmin', fontWeight: 700 }}>
+            <div style={{ background: footer.bg, color: footer.color, display: 'flex', alignItems: 'center', gap: 'calc(var(--u) * 3)', padding: 'calc(var(--u) * 1.4) calc(var(--u) * 3)', fontSize: 'calc(var(--u) * 3.2)', fontWeight: 700 }}>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{footer.text}</span>
               {footer.clock && <Clock tz={sync.screen.timezone} style={{ fontVariantNumeric: 'tabular-nums' }} />}
             </div>
           )}
-          {offline && <span title="Sem conexão — reproduzindo conteúdo salvo" style={{ position: 'absolute', top: '1.5cqmin', right: '1.5cqmin', width: '1.4cqmin', height: '1.4cqmin', borderRadius: '50%', background: '#ef4444', opacity: 0.8 }} />}
+          {offline && <span title="Sem conexão — reproduzindo conteúdo salvo" style={{ position: 'absolute', top: 'calc(var(--u) * 1.5)', right: 'calc(var(--u) * 1.5)', width: 'calc(var(--u) * 1.4)', height: 'calc(var(--u) * 1.4)', borderRadius: '50%', background: '#ef4444', opacity: 0.8 }} />}
         </>
       )}
     </div>

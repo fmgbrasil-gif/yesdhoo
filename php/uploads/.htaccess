@@ -1,0 +1,8 @@
+# pasta so de midias: nunca executar scripts aqui
+Options -Indexes
+<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
