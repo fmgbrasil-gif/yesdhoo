@@ -1,7 +1,7 @@
 import type { Client } from '@prisma/client';
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, like } from '@/lib/db';
 import { fileUrl } from '@/lib/storage';
 import { STATES } from '@/lib/constants';
 import { Avatar, Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
@@ -41,7 +41,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const user = await requireUser();
   const { page, size, skip, take } = pageParams(sp);
-  const where = { tenantId: user.tenantId, ...(sp.q ? { name: { contains: sp.q } } : {}), ...(sp.doc ? { document: sp.doc.replace(/\D/g, '') } : {}) };
+  const where = { tenantId: user.tenantId, ...(sp.q ? { name: like(sp.q) } : {}), ...(sp.doc ? { document: sp.doc.replace(/\D/g, '') } : {}) };
   const [rows, total] = await Promise.all([
     db.client.findMany({ where, skip, take, orderBy: { name: 'asc' }, include: { _count: { select: { medias: true } } } }),
     db.client.count({ where }),

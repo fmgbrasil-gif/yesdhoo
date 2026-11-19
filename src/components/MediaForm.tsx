@@ -1,9 +1,10 @@
 import type { Media } from '@prisma/client';
 import { Field, MultiPicker, Tabs, Toggle, WeekDaysPicker } from './ui';
 import { parseJson } from '@/lib/util';
+import { MediaUpload } from './MediaUpload';
 
 type Opt = { id: string; name: string };
-export type MediaFormData = { clients: Opt[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[] };
+export type MediaFormData = { clients: Opt[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[]; remote: boolean };
 
 function Colors({ fields, cfg }: { fields: [string, string, string][]; cfg: Record<string, string> }) {
   return (
@@ -34,8 +35,8 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
       )}
       {type === 'arquivo' && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Arquivo horizontal" hint={m?.fileH ? 'Já enviado — escolha outro para substituir' : 'Imagem ou vídeo 16:9 (ex.: 1920×1080)'}><input type="file" name="fileH" accept="image/*,video/*" className="input" /></Field>
-          <Field label="Arquivo vertical" hint={m?.fileV ? 'Já enviado — escolha outro para substituir' : 'Imagem ou vídeo 9:16 (ex.: 1080×1920)'}><input type="file" name="fileV" accept="image/*,video/*" className="input" /></Field>
+          <Field label="Arquivo horizontal" hint={m?.fileH ? 'Já enviado — escolha outro para substituir' : 'Imagem ou vídeo 16:9 (ex.: 1920×1080)'}><MediaUpload name="fileH" remote={data.remote} /></Field>
+          <Field label="Arquivo vertical" hint={m?.fileV ? 'Já enviado — escolha outro para substituir' : 'Imagem ou vídeo 9:16 (ex.: 1080×1920)'}><MediaUpload name="fileV" remote={data.remote} /></Field>
           <p className="col-span-2 text-xs text-ink-400">O conteúdo só é reproduzido em telas da mesma orientação do arquivo enviado.</p>
         </div>
       )}

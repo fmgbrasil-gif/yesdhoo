@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Eye, Layers, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, like } from '@/lib/db';
 import { fmtDuration, timeAgo } from '@/lib/util';
 import { mediaThumb } from '@/lib/playables';
 import { mediaFormData } from '@/lib/form-data';
@@ -19,8 +19,8 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
   const { page, size, skip, take } = pageParams(sp);
   const where = {
     tenantId: user.tenantId, type: { in: TYPES },
-    ...(sp.q ? { name: { contains: sp.q } } : {}),
-    ...(sp.cliente ? { client: { name: { contains: sp.cliente } } } : {}),
+    ...(sp.q ? { name: like(sp.q) } : {}),
+    ...(sp.cliente ? { client: { name: like(sp.cliente) } } : {}),
     ...(sp.status === 'ativo' ? { active: true } : sp.status === 'inativo' ? { active: false } : {}),
   };
   const [rows, total, data] = await Promise.all([

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { requireUser, screenScope, type SessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { bool, num, parseJson, str, youtubeId } from '@/lib/util';
-import { isUpload, probe, removeFile, saveFile, videoThumb } from '@/lib/storage';
+import { isRemoteKey, isUpload, probe, removeFile, saveFile, videoThumb } from '@/lib/storage';
 import { MEDIA_TYPES } from '@/lib/constants';
 import type { ActionResult } from '@/components/ui';
 
@@ -50,6 +50,22 @@ export async function saveMedia(_: ActionResult, fd: FormData): Promise<ActionRe
 
   if (type === 'arquivo') {
     for (const side of ['fileH', 'fileV'] as const) {
+      // modo nuvem: o navegador ja enviou o arquivo; chegam aqui o endereco e os dados lidos no navegador
+      const remoteUrl = str(fd, `${side}_url`);
+      if (remoteUrl) {
+        if (!isRemoteKey(remoteUrl)) return { error: 'Endereço de arquivo inválido.' };
+        const meta = parseJson<{ kind?: string; width?: number; height?: number; duration?: number; size?: number; thumb?: string }>(str(fd, `${side}_meta`), {});
+        if (current) await removeFile(current[side]);
+        data[side] = remoteUrl;
+        data.kind = meta.kind === 'video' ? 'video' : 'image';
+        if (side === 'fileH' || !data.size) Object.assign(data, { size: Math.round(Number(meta.size) || 0) || null, width: Math.round(Number(meta.width) || 0) || null, height: Math.round(Number(meta.height) || 0) || null });
+        if (data.kind === 'video') {
+          if (Number(meta.duration) > 0) duration = Math.round(Number(meta.duration));
+          if ((side === 'fileH' || !data.thumb) && typeof meta.thumb === 'string' && meta.thumb.startsWith('data:image/jpeg;base64,') && meta.thumb.length < 400_000)
+            data.thumb = await saveFile(new File([Buffer.from(meta.thumb.split(',')[1], 'base64')], 'thumb.jpg', { type: 'image/jpeg' }), 'midias');
+        } else if (side === 'fileH' || !data.thumb) data.thumb = remoteUrl;
+        continue;
+      }
       const f = fd.get(side);
       if (!isUpload(f)) continue;
       if (!/^(image|video)\//.test(f.type)) return { error: 'Envie apenas arquivos de imagem ou vídeo.' };

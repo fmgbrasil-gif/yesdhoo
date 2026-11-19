@@ -90,6 +90,17 @@ Na Railway: *New Project → Deploy from GitHub repo*, adicione um **Volume** mo
 docker build -t yesdooh . && docker run -p 3000:3000 -v yesdooh-data:/data -e AUTH_SECRET=troque -e ADMIN_EMAIL=voce@empresa.com.br -e ADMIN_PASSWORD=Provisoria123 yesdooh
 ```
 
+### Vercel + Supabase
+
+Na Vercel o sistema usa **Postgres** (Supabase) e guarda as mídias no **Vercel Blob**; o navegador envia os vídeos direto para o armazenamento. O `vercel.json` já chama `scripts/vercel-build.mjs`, que troca o banco para Postgres, cria as tabelas e a conta inicial.
+
+| Variável | Valor |
+| --- | --- |
+| `DATABASE_URL` | Conexão do Supabase pelo *pooler* em modo transação (porta 6543), com `?pgbouncer=true&connection_limit=1` |
+| `DIRECT_URL` | Conexão do Supabase pelo *pooler* em modo sessão (porta 5432), usada para criar as tabelas |
+| `BLOB_READ_WRITE_TOKEN` | Criada pela Vercel ao conectar um *Blob store* ao projeto |
+| `AUTH_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Como na tabela acima |
+
 ## Arquitetura
 
 - **Next.js 15** (App Router, Server Components e Server Actions) + **TypeScript** + **Tailwind CSS**

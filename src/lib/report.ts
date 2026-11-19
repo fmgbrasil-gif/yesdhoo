@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, like } from './db';
 import { screenScope, type SessionUser } from './auth';
 import { localDate } from './util';
 
@@ -13,7 +13,7 @@ export async function playReport(user: SessionUser, f: ReportFilters) {
   const stats = await db.playStat.findMany({
     where: {
       screenId: { in: screens.map((s) => s.id) }, date: { gte: start, lte: end },
-      media: { ...(f.midia ? { name: { contains: f.midia } } : {}), ...(f.cliente ? { clientId: f.cliente } : {}) },
+      media: { ...(f.midia ? { name: like(f.midia) } : {}), ...(f.cliente ? { clientId: f.cliente } : {}) },
     },
     include: { media: { select: { name: true, duration: true, client: { select: { name: true } } } } },
   });

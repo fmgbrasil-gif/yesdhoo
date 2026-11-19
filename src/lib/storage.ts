@@ -3,13 +3,21 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { del, put } from '@vercel/blob';
 
 const run = promisify(execFile);
 
-/** Armazenamento local em disco. Para producao, troque por S3/Supabase Storage mantendo esta interface. */
+/**
+ * Armazenamento de arquivos com dois modos:
+ * - local: pasta em disco (desenvolvimento, Docker, Railway) — a chave e um caminho relativo;
+ * - nuvem: Vercel Blob, ativado quando existe BLOB_READ_WRITE_TOKEN — a chave e a URL publica do arquivo.
+ */
+export const REMOTE = !!process.env.BLOB_READ_WRITE_TOKEN;
 export const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR || 'storage');
+const BLOB_HOST = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//;
 
-export const fileUrl = (key?: string | null) => (key ? `/api/arquivos/${key}` : null);
+export const isRemoteKey = (key?: string | null): key is string => !!key && BLOB_HOST.test(key);
+export const fileUrl = (key?: string | null) => (!key ? null : isRemoteKey(key) ? key : `/api/arquivos/${key}`);
 
 export function storagePath(key: string) {
   const p = path.resolve(STORAGE_DIR, key);
@@ -17,9 +25,14 @@ export function storagePath(key: string) {
   return p;
 }
 
+function newKey(name: string, folder: string) {
+  const ext = (path.extname(name) || '').toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8);
+  return `${folder}/${crypto.randomUUID()}${ext}`;
+}
+
 export async function saveFile(file: File, folder: string) {
-  const ext = (path.extname(file.name) || '').toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8);
-  const key = `${folder}/${crypto.randomUUID()}${ext}`;
+  const key = newKey(file.name, folder);
+  if (REMOTE) return (await put(key, file, { access: 'public', contentType: file.type || undefined })).url;
   const dest = storagePath(key);
   await mkdir(path.dirname(dest), { recursive: true });
   await writeFile(dest, Buffer.from(await file.arrayBuffer()));
@@ -28,12 +41,14 @@ export async function saveFile(file: File, folder: string) {
 
 export async function removeFile(key?: string | null) {
   if (!key) return;
+  if (isRemoteKey(key)) { if (REMOTE) await del(key).catch(() => {}); return; }
+  if (/^https?:/.test(key)) return;
   await unlink(storagePath(key)).catch(() => {});
 }
 
 export const isUpload = (v: FormDataEntryValue | null): v is File => v instanceof File && v.size > 0;
 
-/** Le duracao/dimensoes com ffprobe (quando disponivel no servidor). */
+/** Le duracao/dimensoes com ffprobe (modo local, quando o ffprobe existe no servidor). */
 export async function probe(key: string) {
   const p = storagePath(key);
   const size = (await stat(p)).size;
@@ -47,7 +62,7 @@ export async function probe(key: string) {
   }
 }
 
-/** Gera miniatura JPG de um video (primeiro segundo). */
+/** Gera miniatura JPG de um video (modo local). */
 export async function videoThumb(key: string) {
   const out = key.replace(/\.[^.]+$/, '') + '-thumb.jpg';
   try {

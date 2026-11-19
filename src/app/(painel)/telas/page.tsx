@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ListVideo, Plus, Search } from 'lucide-react';
 import { requireUser, screenScope } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db, like } from '@/lib/db';
 import { isOnline, onlineCutoff, timeAgo } from '@/lib/util';
 import { fileUrl } from '@/lib/storage';
 import { ORIENTATIONS } from '@/lib/constants';
@@ -21,7 +21,7 @@ export default async function TelasPage({ searchParams }: { searchParams: Promis
   const status = sp.status === 'online' || sp.status === 'offline' ? sp.status : 'todas';
   const where = {
     ...scope,
-    ...(sp.q ? { name: { contains: sp.q } } : {}),
+    ...(sp.q ? { name: like(sp.q) } : {}),
     ...(sp.orientation === 'H' || sp.orientation === 'V' ? { orientation: sp.orientation } : {}),
     ...(status === 'online' ? onlineWhere : status === 'offline' ? offlineWhere : {}),
   };
