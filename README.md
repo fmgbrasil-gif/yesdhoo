@@ -64,6 +64,32 @@ Para TVs montadas na vertical com o sistema em paisagem, abra `/player?girar=90`
 Ainda **não** implementado: integração com Instagram (depende de app aprovado na Meta), mídia programática e cobrança
 automática de telas adicionais.
 
+## Proteção de acesso
+
+- **Login obrigatório** em todo o painel, com perfis *Administrador* (gerencia usuários) e *Operador*, e permissão por tela.
+- **Senha provisória:** a conta inicial e todo usuário criado pelo administrador são obrigados a criar a própria senha no primeiro acesso.
+- **Política de senha:** mínimo de 8 caracteres, com letras e números; senhas muito comuns são recusadas.
+- **Bloqueio contra força bruta:** 5 senhas erradas para o mesmo e-mail (ou 20 do mesmo IP) em 15 minutos bloqueiam novas tentativas por 15 minutos. O pareamento de telas bloqueia após 10 códigos errados.
+- **Sessões:** cookie assinado, `HttpOnly`, `Secure` e `SameSite=Lax`. Trocar a senha ou desativar um usuário derruba as sessões abertas na hora.
+- **Arquivos enviados** são servidos com política que impede execução de scripts; o painel não pode ser embutido em outros sites e força HTTPS.
+- O player não usa login: cada aparelho recebe um token próprio no pareamento, revogado ao resetar a tela.
+
+## Publicar
+
+O repositório traz um `Dockerfile` pronto (com `ffmpeg`). O banco e as mídias ficam no volume `/data`, que precisa ser persistente.
+
+| Variável | Para quê |
+| --- | --- |
+| `AUTH_SECRET` | Segredo longo e aleatório que assina as sessões (obrigatório) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Conta inicial, criada só na primeira subida; a senha é provisória |
+| `TENANT_NAME`, `PLAN_SCREENS` | Nome da rede e limite de telas (opcionais) |
+
+Na Railway: *New Project → Deploy from GitHub repo*, adicione um **Volume** montado em `/data`, preencha as variáveis e gere um domínio em *Settings → Networking*. O arquivo `railway.json` já aponta para o Dockerfile.
+
+```bash
+docker build -t yesdooh . && docker run -p 3000:3000 -v yesdooh-data:/data -e AUTH_SECRET=troque -e ADMIN_EMAIL=voce@empresa.com.br -e ADMIN_PASSWORD=Provisoria123 yesdooh
+```
+
 ## Arquitetura
 
 - **Next.js 15** (App Router, Server Components e Server Actions) + **TypeScript** + **Tailwind CSS**

@@ -11,9 +11,9 @@ function secret() {
   return new TextEncoder().encode(value || 'somente-desenvolvimento');
 }
 
-export async function createSession(userId: string, remember: boolean) {
+export async function createSession(userId: string, remember: boolean, sessionVersion = 0) {
   const days = remember ? 30 : 1;
-  const token = await new SignJWT({ sub: userId }).setProtectedHeader({ alg: 'HS256' }).setExpirationTime(`${days}d`).sign(secret());
+  const token = await new SignJWT({ sub: userId, sv: sessionVersion }).setProtectedHeader({ alg: 'HS256' }).setExpirationTime(`${days}d`).sign(secret());
   (await cookies()).set(COOKIE, token, {
     httpOnly: true, sameSite: 'lax', path: '/', secure: process.env.NODE_ENV === 'production',
     ...(remember ? { maxAge: days * 86400 } : {}),
@@ -33,7 +33,8 @@ export const getUser = cache(async () => {
       where: { id: String(payload.sub) },
       include: { tenant: true, screens: { select: { screenId: true } } },
     });
-    return user && user.active ? user : null;
+    // usuario desativado ou senha trocada depois da emissao: sessao deixa de valer
+    return user && user.active && user.sessionVersion === Number(payload.sv ?? 0) ? user : null;
   } catch {
     return null;
   }
@@ -44,6 +45,7 @@ export type SessionUser = NonNullable<Awaited<ReturnType<typeof getUser>>>;
 export async function requireUser() {
   const user = await getUser();
   if (!user) redirect('/login');
+  if (user.mustChangePassword) redirect('/trocar-senha');
   return user;
 }
 

@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env
+storage
+prisma/dev.db*
+android
+php
+demo
+docs
+*.tsbuildinfo

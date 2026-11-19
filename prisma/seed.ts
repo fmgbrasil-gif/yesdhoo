@@ -24,15 +24,17 @@ async function main() {
   for (const name of SEGMENTS) await db.category.upsert({ where: { name }, create: { name }, update: {} });
   const cat = Object.fromEntries((await db.category.findMany()).map((c) => [c.name, c.id]));
 
-  const tenant = await db.tenant.create({ data: { name: 'Rede Demonstração', planScreens: 12 } });
+  // Producao: com ADMIN_EMAIL definido, cria apenas a conta e o administrador (senha provisoria, trocada no 1o acesso).
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const production = !!adminEmail;
+  if (production && (process.env.ADMIN_PASSWORD ?? '').length < 8) throw new Error('Defina ADMIN_PASSWORD (mínimo de 8 caracteres) junto com ADMIN_EMAIL.');
+  const tenant = await db.tenant.create({ data: { name: process.env.TENANT_NAME || (production ? 'Minha rede' : 'Rede Demonstração'), planScreens: Number(process.env.PLAN_SCREENS) || (production ? 50 : 12) } });
   await db.user.create({
-    data: { tenantId: tenant.id, name: 'Administrador', email: 'admin@yesdooh.com.br', passwordHash: await bcrypt.hash('yesdooh123', 10), role: 'admin' },
+    data: {
+      tenantId: tenant.id, name: 'Administrador', role: 'admin', email: adminEmail ?? 'admin@yesdooh.com.br',
+      passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD ?? 'yesdooh123', 12), mustChangePassword: production,
+    },
   });
-
-  const clients = await Promise.all(
-    [['Academia Corpo Ativo', 'Academias'], ['Restaurante Sabor da Praça', 'Restaurantes'], ['Mercado Bom Preço', 'Supermercados'], ['Ótica Visão Clara', 'Ótica'], ['Pet Shop Amigo Fiel', 'Pet Shop']]
-      .map(([name]) => db.client.create({ data: { tenantId: tenant.id, name, type: 'PJ', city: 'Ribeirão Preto', state: 'SP' } })),
-  );
 
   // biblioteca global de conteudos dinamicos (modelos proprios, renderizados pelo player)
   const lib = (library: string, name: string, type: string, config: object, duration = 12, url?: string) =>
@@ -53,6 +55,13 @@ async function main() {
     lib('diversos', 'Trânsito seguro', 'aviso', { title: 'Trânsito seguro', text: 'Se beber, não dirija. Use o cinto e respeite os limites de velocidade.', bg: '#7f1d1d', titleColor: '#ffffff', textColor: '#fee2e2', showTitle: true }),
   ]);
   const library = await db.media.findMany({ where: { tenantId: null } });
+
+  if (production) { console.log(`Conta criada. Entre com ${adminEmail} e a senha provisória definida em ADMIN_PASSWORD.`); return; }
+
+  const clients = await Promise.all(
+    [['Academia Corpo Ativo', 'Academias'], ['Restaurante Sabor da Praça', 'Restaurantes'], ['Mercado Bom Preço', 'Supermercados'], ['Ótica Visão Clara', 'Ótica'], ['Pet Shop Amigo Fiel', 'Pet Shop']]
+      .map(([name]) => db.client.create({ data: { tenantId: tenant.id, name, type: 'PJ', city: 'Ribeirão Preto', state: 'SP' } })),
+  );
 
   const palette = [['#0b1120', '#f9c21a'], ['#7c2d12', '#ffedd5'], ['#14532d', '#dcfce7'], ['#1e3a8a', '#dbeafe'], ['#581c87', '#f3e8ff']];
   const medias = [];

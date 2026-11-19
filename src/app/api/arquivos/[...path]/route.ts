@@ -16,7 +16,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
     const file = storagePath(key);
     const { size } = await stat(file);
     const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    const base = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable' };
+    // arquivos enviados nunca executam scripts nem sao interpretados como outro tipo (ex.: SVG com codigo)
+    const base = {
+      'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    };
     const range = req.headers.get('range')?.match(/bytes=(\d*)-(\d*)/);
     if (range) {
       const start = range[1] ? Number(range[1]) : 0;
