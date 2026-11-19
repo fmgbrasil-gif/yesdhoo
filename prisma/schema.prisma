@@ -1,0 +1,255 @@
+// Para producao com Postgres (ex.: Supabase), troque provider para "postgresql".
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         String   @id @default(uuid())
+  name       String
+  planScreens Int     @default(10)
+  createdAt  DateTime @default(now())
+  users      User[]
+  screens    Screen[]
+  clients    Client[]
+  medias     Media[]
+  groups     MediaGroup[]
+  notifications Notification[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String
+  email        String   @unique
+  passwordHash String
+  image        String?
+  timezone     String   @default("America/Sao_Paulo")
+  role         String   @default("admin") // admin | operador
+  restricted   Boolean  @default(false)   // restringe acesso a conteudos privados
+  active       Boolean  @default(true)
+  notes        String   @default("")
+  createdAt    DateTime @default(now())
+  screens      UserScreen[]
+  commands     Command[]
+}
+
+// Permissao de telas por usuario (vazio = todas)
+model UserScreen {
+  userId   String
+  screenId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  screen   Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  @@id([userId, screenId])
+}
+
+model Category {
+  id      String   @id @default(uuid())
+  name    String   @unique
+  screens Screen[]
+  medias  Media[]
+}
+
+model Client {
+  id           String   @id @default(uuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type         String   @default("PJ") // PF | PJ
+  document     String?
+  name         String
+  email        String?
+  phone1       String?
+  phone2       String?
+  image        String?
+  road         String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  zipcode      String?
+  city         String?
+  state        String?
+  createdAt    DateTime @default(now())
+  medias       Media[]
+  screens      Screen[]
+}
+
+model Screen {
+  id              String    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  image           String?
+  orientation     String    @default("H") // H | V
+  categoryId      String?
+  category        Category? @relation(fields: [categoryId], references: [id])
+  clientId        String?
+  client          Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  phone1          String?
+  phone2          String?
+  road            String?
+  number          String?
+  complement      String?
+  neighborhood    String?
+  zipcode         String?
+  city            String?
+  state           String?
+  latitude        Float?
+  longitude       Float?
+  workStart       String?   // HH:MM
+  workEnd         String?
+  weekDays        String    @default("") // "0,1,2..." (0 = domingo); vazio = todos
+  avgFlow         Int?      // fluxo medio de pessoas/dia
+  timezone        String    @default("America/Sao_Paulo")
+  updateFrequency Int       @default(10) // minutos
+  audioEnabled    Boolean   @default(false)
+  footerEnabled   Boolean   @default(false)
+  footerText      String    @default("Anuncie aqui")
+  footerBg        String    @default("#000000")
+  footerColor     String    @default("#FFFFFF")
+  footerClock     Boolean   @default(true)
+  footerWeather   Boolean   @default(false)
+  favorite        Boolean   @default(false)
+  notes           String    @default("")
+  // pareamento / dispositivo
+  pairingCode     String    @unique
+  deviceToken     String?   @unique
+  deviceInfo      String    @default("{}") // JSON com modelo, SO, versao do app etc.
+  lastSeenAt      DateTime?
+  syncedAt        DateTime?
+  playlistVersion Int       @default(1)
+  syncedVersion   Int       @default(0)
+  screenshot      String?
+  screenshotAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  items           PlaylistItem[]
+  commands        Command[]
+  stats           PlayStat[]
+  uptime          ScreenUptime[]
+  users           UserScreen[]
+}
+
+// Conteudo reproduzivel. tenantId nulo = biblioteca global (conteudos dinamicos).
+model Media {
+  id           String    @id @default(uuid())
+  tenantId     String?
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // arquivo | youtube | link | aviso | rss | hora | dolar | clima
+  type         String    @default("arquivo")
+  library      String?   // secao da biblioteca: marca | saude | sazonais | noticias | diversos
+  name         String
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  categoryId   String?
+  category     Category? @relation(fields: [categoryId], references: [id])
+  kind         String?   // image | video (para type=arquivo)
+  fileH        String?   // arquivo horizontal
+  fileV        String?   // arquivo vertical
+  thumb        String?
+  url          String?   // youtube / link / feed rss
+  config       String    @default("{}") // JSON: cores, textos, fonte etc.
+  duration     Int       @default(15)   // segundos
+  size         Int?      // bytes
+  width        Int?
+  height       Int?
+  storeStats   Boolean   @default(true)
+  active       Boolean   @default(true)
+  // agendamento
+  startDate    String?   // YYYY-MM-DD
+  endDate      String?
+  shiftStart   String?   // HH:MM
+  shiftEnd     String?
+  weekDays     String    @default("")
+  notes        String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  items        PlaylistItem[]
+  groupItems   MediaGroupItem[]
+  stats        PlayStat[]
+}
+
+model MediaGroup {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  image     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  medias    MediaGroupItem[]
+  items     PlaylistItem[]
+}
+
+model MediaGroupItem {
+  groupId  String
+  mediaId  String
+  position Int        @default(0)
+  group    MediaGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  media    Media      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  @@id([groupId, mediaId])
+}
+
+// Um item da playlist aponta para uma midia OU para um grupo (que alterna suas midias a cada ciclo).
+model PlaylistItem {
+  id       String      @id @default(uuid())
+  screenId String
+  screen   Screen      @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  mediaId  String?
+  media    Media?      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  groupId  String?
+  group    MediaGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  position Int
+  @@index([screenId, position])
+}
+
+model Command {
+  id         String    @id @default(uuid())
+  screenId   String
+  screen     Screen    @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type       String    // recarregar | sincronizar | screenshot | limpar_cache
+  status     String    @default("pendente") // pendente | executado
+  createdAt  DateTime  @default(now())
+  executedAt DateTime?
+  @@index([screenId, status])
+}
+
+// Comprovacao de exibicao agregada por dia
+model PlayStat {
+  screenId String
+  mediaId  String
+  date     String // YYYY-MM-DD
+  count    Int    @default(0)
+  screen   Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  media    Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  @@id([screenId, mediaId, date])
+  @@index([date])
+}
+
+// Minutos online por dia (alimentado pelo heartbeat do player)
+model ScreenUptime {
+  screenId String
+  date     String
+  minutes  Int    @default(0)
+  screen   Screen @relation(fields: [screenId], references: [id], onDelete: Cascade)
+  @@id([screenId, date])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  key       String?  // evita duplicidade
+  message   String
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@unique([tenantId, key])
+}
