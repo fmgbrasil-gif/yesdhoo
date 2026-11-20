@@ -9,6 +9,7 @@ import { Field } from './ui';
 import type { ServiceOpt } from './InvoiceItems';
 import { contractToPdf } from '@/lib/pdf-client';
 import { wizardCharge, wizardContract, wizardDocs } from '@/app/(painel)/financeiro/wizard';
+import { saveAi } from '@/app/(painel)/empresa/actions';
 
 type Opt = { id: string; name: string; kind: string };
 type Charge = { invoiceId: string | null; subscriptionId: string | null; clientId: string; message: string };
@@ -42,6 +43,19 @@ export function ChargeWizard({ clients, services, today, hasAi }: { clients: Opt
   const [contract, setContract] = useState<Contract | null>(null);
   const [docs, setDocs] = useState<Docs | null>(null);
   const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [aiReady, setAiReady] = useState(hasAi);
+  const [aiKey, setAiKey] = useState('');
+  const [aiMsg, setAiMsg] = useState('');
+  const [keySaved, setKeySaved] = useState(false);
+  // cadastra a chave da OpenAI sem sair do fluxo (a cobranca ja criada continua aqui)
+  const saveKey = async () => {
+    setBusy(true); setAiMsg('');
+    const fd = new FormData(); fd.set('aiApiKey', aiKey);
+    const r = await saveAi(undefined, fd);
+    setBusy(false);
+    if (r?.error) { setAiMsg(r.error); return; }
+    setAiKey(''); setAiReady(true); setKeySaved(true);
+  };
   const invoiceFrame = useRef<HTMLIFrameElement>(null);
   const pixFrame = useRef<HTMLIFrameElement>(null);
 
@@ -109,13 +123,23 @@ export function ChargeWizard({ clients, services, today, hasAi }: { clients: Opt
             </div>
           ) : (
             <form onSubmit={submitContract} className="space-y-4">
-              {!hasAi && <p className="rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">A geração com IA ainda não foi configurada. <a href="/empresa#ia" className="font-semibold underline">Cadastre a chave da OpenAI</a> ou pule esta etapa.</p>}
+              {!aiReady && (
+                <div className="space-y-2 rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">
+                  <p>Para gerar o contrato com IA, cole a chave da API da OpenAI (ChatGPT). Ela fica salva em Minha empresa para as próximas cobranças. Crie a chave em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="font-semibold underline">platform.openai.com/api-keys</a>. Se preferir, pule esta etapa.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <input type="password" autoComplete="off" aria-label="Chave da API da OpenAI" placeholder="sk-..." value={aiKey} onChange={(e) => setAiKey(e.target.value)} className="input max-w-md flex-1" />
+                    <button type="button" className="btn-dark" disabled={busy || !aiKey.trim()} onClick={saveKey}>{busy ? <Loader2 size={15} className="animate-spin" /> : null} Salvar chave</button>
+                  </div>
+                  {aiMsg && <p className="text-xs text-red-600" role="alert">{aiMsg}</p>}
+                </div>
+              )}
+              {keySaved && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Chave da OpenAI salva e testada. Agora é só gerar o contrato.</p>}
               <p className="text-sm text-ink-500">A IA redige o contrato com os dados da sua empresa, do cliente e desta cobrança. Leva de 30 segundos a 2 minutos.</p>
               <Field label="Instruções adicionais (opcional)" hint="Ex.: 3 telas, vídeos de até 15 segundos, exclusividade no segmento"><textarea name="extra" rows={3} maxLength={2000} className="input" /></Field>
               <Field label="Anexos (opcional)" hint="PDF ou imagens, até 5 arquivos e 4 MB no total"><input type="file" name="attachments" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" className="input" /></Field>
               <div className="flex flex-wrap justify-end gap-2">
                 <button type="button" className="btn-ghost" onClick={next} disabled={busy}><SkipForward size={15} /> Pular contrato</button>
-                <button className="btn-primary" disabled={busy || !hasAi}>{busy ? <><Loader2 size={15} className="animate-spin" /> Gerando contrato...</> : 'Gerar contrato com IA'}</button>
+                <button className="btn-primary" disabled={busy || !aiReady}>{busy ? <><Loader2 size={15} className="animate-spin" /> Gerando contrato...</> : 'Gerar contrato com IA'}</button>
               </div>
             </form>
           )}
