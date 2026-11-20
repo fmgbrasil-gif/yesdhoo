@@ -6,6 +6,7 @@ import { fileUrl } from '@/lib/storage';
 import { refreshNotifications } from '@/lib/notifications';
 import { brandCss } from '@/lib/tenant';
 import { Sidebar } from '@/components/Sidebar';
+import { Watermark } from '@/components/Brand';
 import { logout } from '../login/actions';
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,7 @@ export default async function PainelLayout({ children }: { children: React.React
         logout={logout}
         markRead={markRead}
       />
+      <Watermark src={fileUrl(user.tenant.logo)} />
       <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
     </div>
   );

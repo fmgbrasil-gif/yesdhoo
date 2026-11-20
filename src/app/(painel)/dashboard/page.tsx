@@ -9,7 +9,7 @@ import { Notes } from '@/components/Notes';
 import MapView from '@/components/MapLazy';
 import { saveUserNotes } from './actions';
 
-const SEG_COLORS = ['#f0b000', '#0ea5e9', '#10b981', '#f43f5e', '#8b5cf6', '#f97316', '#14b8a6', '#64748b'];
+const SEG_COLORS = ['#8a52f8', '#0ea5e9', '#10b981', '#f43f5e', '#8b5cf6', '#f97316', '#14b8a6', '#64748b'];
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 export default async function Dashboard() {

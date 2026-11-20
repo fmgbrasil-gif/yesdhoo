@@ -20,7 +20,7 @@ async function readTenantFields(fd: FormData, currentId?: string) {
   if (slug.length < 3) return { error: 'O endereço de acesso precisa de ao menos 3 letras.' } as const;
   const taken = await db.tenant.findUnique({ where: { slug } });
   if (taken && taken.id !== currentId) return { error: `O endereço “${slug}” já é usado por outra empresa.` } as const;
-  const color = str(fd, 'color') ?? '#f0b000';
+  const color = str(fd, 'color') ?? '#8a52f8';
   if (!COLOR.test(color)) return { error: 'Cor inválida.' } as const;
   const planScreens = Math.max(1, Math.min(10000, Number(str(fd, 'planScreens')) || 10));
   const fee = str(fd, 'monthlyFee');

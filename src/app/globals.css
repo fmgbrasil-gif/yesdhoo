@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  :root { --brand-50: 255 249 230; --brand-100: 255 239 184; --brand-300: 255 213 74; --brand-400: 249 194 26; --brand-500: 240 176 0; --brand-600: 201 143 0; --brand-700: 143 101 0; --on-brand: 11 17 32; }
+  :root { --brand-50: 246 241 254; --brand-100: 229 217 253; --brand-300: 173 134 250; --brand-400: 138 82 248; --brand-500: 127 75 228; --brand-600: 108 64 193; --brand-700: 76 45 136; --on-brand: 255 255 255; }
   body { @apply bg-ink-50 text-ink-800 antialiased dark:bg-ink-950 dark:text-ink-100; }
   h1 { @apply text-2xl font-bold tracking-tight; }
 }

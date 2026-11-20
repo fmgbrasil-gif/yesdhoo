@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
+import { DevCredit } from './Brand';
 
 type Notif = { id: string; message: string; link: string | null; read: boolean };
 type Props = {
@@ -74,7 +75,7 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
         <div className="flex items-center justify-between px-5 py-5">
           <Link href="/dashboard" aria-label="Início" className="flex min-w-0 items-center gap-2">
             {company.logo
-              ? <><img src={company.logo} alt="" className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5" />{!mini && <span className="truncate text-sm font-bold text-white">{company.name}</span>}</> /* eslint-disable-line @next/next/no-img-element */
+              ? <><img src={company.logo} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-white object-contain p-0.5" />{!mini && <span className="truncate text-sm font-bold text-white">{company.name}</span>}</> /* eslint-disable-line @next/next/no-img-element */
               : <Logo compact={mini} />}
           </Link>
           <button className={`${tool} lg:hidden`} aria-label="Fechar menu" onClick={() => setOpen(false)}><X size={18} /></button>
@@ -122,6 +123,7 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
             </span>
           </Link>
         </div>
+        <div className={`border-t border-ink-800 px-4 py-2 ${mini ? 'lg:hidden' : ''}`}><DevCredit dark /></div>
       </aside>
       {bell && (
         <div className="fixed inset-0 z-50" onClick={() => setBell(false)}>

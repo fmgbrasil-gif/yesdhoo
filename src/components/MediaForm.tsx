@@ -57,7 +57,7 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
         <>
           <Toggle name="showTitle" label="Exibir título" defaultChecked={m ? String(cfg.showTitle) !== 'false' : true} />
           <Field label="Texto" hint="Até 400 caracteres"><textarea name="text" required maxLength={400} rows={4} defaultValue={cfg.text ?? ''} className="input" /></Field>
-          <Colors cfg={cfg} fields={[['bg', 'Cor de fundo', '#0b1120'], ['titleColor', 'Cor do título', '#f9c21a'], ['textColor', 'Cor do texto', '#ffffff']]} />
+          <Colors cfg={cfg} fields={[['bg', 'Cor de fundo', '#1b0c30'], ['titleColor', 'Cor do título', '#b58cff'], ['textColor', 'Cor do texto', '#ffffff']]} />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Tamanho da fonte"><select name="fontSize" defaultValue={cfg.fontSize ?? 'padrao'} className="input"><option value="padrao">Padrão</option><option value="pequena">Pequena</option><option value="grande">Grande</option></select></Field>
             <Field label="Imagem (opcional)"><input type="file" name="image" accept="image/*" className="input" /></Field>
@@ -68,7 +68,7 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
         <>
           <p className="rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">Escolha combinações de cores suaves e legíveis. Muito brilho pode dificultar a leitura.</p>
           {type === 'hora' && <Field label="Imagem / logo" hint="Tamanho sugerido: 600×600px"><input type="file" name="image" accept="image/*" className="input" /></Field>}
-          <Colors cfg={cfg} fields={[['bg', 'Cor de fundo', '#0b1120'], ['color', 'Cor da fonte', '#ffffff']]} />
+          <Colors cfg={cfg} fields={[['bg', 'Cor de fundo', '#1b0c30'], ['color', 'Cor da fonte', '#ffffff']]} />
         </>
       )}
       {duration}

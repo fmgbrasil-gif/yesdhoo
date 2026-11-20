@@ -16,8 +16,8 @@ export function ScreenFields({ screen, categories, clients }: { screen?: Screen;
           <>
             <Field label="Orientação">
               <div className="flex gap-4 text-sm">
-                <label className="flex items-center gap-2"><input type="radio" name="orientation" value="H" defaultChecked={s?.orientation !== 'V'} className="accent-amber-500" /> Horizontal</label>
-                <label className="flex items-center gap-2"><input type="radio" name="orientation" value="V" defaultChecked={s?.orientation === 'V'} className="accent-amber-500" /> Vertical</label>
+                <label className="flex items-center gap-2"><input type="radio" name="orientation" value="H" defaultChecked={s?.orientation !== 'V'} className="accent-violet-500" /> Horizontal</label>
+                <label className="flex items-center gap-2"><input type="radio" name="orientation" value="V" defaultChecked={s?.orientation === 'V'} className="accent-violet-500" /> Vertical</label>
               </div>
             </Field>
             <Field label="Nome"><input name="name" required defaultValue={s?.name} className="input" placeholder="Ex.: Academia Mais Músculo — Recepção" /></Field>

@@ -6,6 +6,7 @@ import { fileUrl } from '@/lib/storage';
 import { fmtDate, fmtMoney } from '@/lib/money';
 import { invoiceItems, invoicePix, invoiceState, METHODS, STATE_LABEL } from '@/lib/billing';
 import { CopyButton } from '@/components/CopyButton';
+import { DevCredit } from '@/components/Brand';
 
 export const metadata: Metadata = { title: 'Fatura', robots: { index: false, follow: false } };
 
@@ -21,7 +22,7 @@ export default async function FaturaPage({ params }: { params: Promise<{ token: 
   const pix = open ? invoicePix(inv, t) : null;
   const qr = pix ? await QRCode.toDataURL(pix, { margin: 1, width: 360, errorCorrectionLevel: 'M' }) : null;
   const items = invoiceItems(inv);
-  const color = /^#[0-9a-f]{6}$/i.test(t.color) ? t.color : '#f0b000';
+  const color = /^#[0-9a-f]{6}$/i.test(t.color) ? t.color : '#8a52f8';
   const tone: Record<string, string> = { aberta: '#0369a1', vencida: '#b91c1c', paga: '#047857', cancelada: '#52627f' };
 
   return (
@@ -86,6 +87,7 @@ export default async function FaturaPage({ params }: { params: Promise<{ token: 
         {inv.status === 'cancelada' && <p className="border-t border-ink-100 p-6 text-center font-semibold text-ink-500">Esta fatura foi cancelada e não deve ser paga.</p>}
       </div>
       <p className="mt-4 text-center text-xs text-ink-400 print:hidden">Para salvar em PDF, use Imprimir no seu navegador (Ctrl + P).</p>
+      <div className="mt-2 flex justify-center"><DevCredit /></div>
     </main>
   );
 }

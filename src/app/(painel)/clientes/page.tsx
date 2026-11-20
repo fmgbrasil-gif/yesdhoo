@@ -20,8 +20,8 @@ function ClientFields({ c }: { c?: Client }) {
       <div className="grid grid-cols-6 gap-3">
         <Field label="Cadastro" className="col-span-6">
           <div className="flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2"><input type="radio" name="kind" value="cliente" defaultChecked={c?.kind !== 'parceiro'} className="accent-amber-500" /> Cliente (anunciante, compra mídia)</label>
-            <label className="flex items-center gap-2"><input type="radio" name="kind" value="parceiro" defaultChecked={c?.kind === 'parceiro'} className="accent-amber-500" /> Parceiro (local onde fica a tela)</label>
+            <label className="flex items-center gap-2"><input type="radio" name="kind" value="cliente" defaultChecked={c?.kind !== 'parceiro'} className="accent-violet-500" /> Cliente (anunciante, compra mídia)</label>
+            <label className="flex items-center gap-2"><input type="radio" name="kind" value="parceiro" defaultChecked={c?.kind === 'parceiro'} className="accent-violet-500" /> Parceiro (local onde fica a tela)</label>
           </div>
         </Field>
         <Field label="Tipo" className="col-span-2">

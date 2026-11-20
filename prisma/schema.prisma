@@ -18,7 +18,7 @@ model Tenant {
   slug           String?   @unique         // endereco de login personalizado: /login?empresa=slug
   document       String?                   // CNPJ
   logo           String?
-  color          String    @default("#f0b000") // cor da marca no painel
+  color          String    @default("#8a52f8") // cor da marca no painel (padrao: violeta da Yes)
   status         String    @default("ativo")   // ativo | bloqueado
   blockedReason  String?
   blockedAt      DateTime?

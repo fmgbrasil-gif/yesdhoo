@@ -23,7 +23,7 @@ export default function Map({ points, height = 220, inputs }: { points: MapPoint
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(map);
       const icon = (on?: boolean) => L.divIcon({
         className: '',
-        html: `<div style="width:18px;height:18px;border-radius:50%;background:${on === false ? '#7384a3' : '#f0b000'};border:3px solid #0b1120;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+        html: `<div style="width:18px;height:18px;border-radius:50%;background:${on === false ? '#8d7bb0' : '#8a52f8'};border:3px solid #1b0c30;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
         iconSize: [18, 18], iconAnchor: [9, 9],
       });
       const markers = pts.map((p) => {

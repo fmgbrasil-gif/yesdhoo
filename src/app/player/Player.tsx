@@ -91,7 +91,7 @@ function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; a
     return () => { dead = true; };
   }, [media.id, media.type, needsData, api, skip]);
 
-  const bg = String(cfg.bg ?? '#0b1120');
+  const bg = String(cfg.bg ?? '#1b0c30');
   const color = String(cfg.textColor ?? cfg.color ?? '#ffffff');
   const image = typeof cfg.image === 'string' ? `/api/arquivos/${cfg.image}` : null;
   const base: CSSProperties = { ...center, background: bg, color };
@@ -195,12 +195,12 @@ function Pairing({ onPaired }: { onPaired: (token: string) => void }) {
     setBusy(false);
   };
   return (
-    <form onSubmit={submit} style={{ ...center, background: '#0b1120', color: '#fff' }}>
-      <p style={{ fontSize: 'calc(var(--u) * 7)', fontWeight: 900 }}>Yes<span style={{ color: '#f9c21a' }}>DOOH</span> Player</p>
+    <form onSubmit={submit} style={{ ...center, background: '#1b0c30', color: '#fff' }}>
+      <p style={{ fontSize: 'calc(var(--u) * 7)', fontWeight: 900 }}>Yes<span style={{ color: '#b58cff' }}>DOOH</span> Player</p>
       <p style={{ fontSize: 'calc(var(--u) * 3.2)', opacity: 0.8, maxWidth: 'calc(var(--uw) * 80)' }}>Digite o código de pareamento exibido no painel, na página da tela.</p>
       <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} autoFocus aria-label="Código de pareamento" placeholder="ABC123" autoComplete="off"
-        style={{ fontSize: 'calc(var(--u) * 9)', fontFamily: 'monospace', fontWeight: 900, letterSpacing: '.3em', textAlign: 'center', width: '7em', maxWidth: 'calc(var(--uw) * 90)', padding: '.2em', borderRadius: 'calc(var(--u) * 1)', border: '3px solid #f9c21a', background: '#161d2e', color: '#fff', outline: 'none' }} />
-      <button disabled={busy || code.length !== 6} style={{ fontSize: 'calc(var(--u) * 4)', fontWeight: 800, padding: '.5em 1.6em', borderRadius: 'calc(var(--u) * 1)', background: '#f9c21a', color: '#0b1120', opacity: busy || code.length !== 6 ? 0.5 : 1 }}>{busy ? 'Pareando...' : 'Parear tela'}</button>
+        style={{ fontSize: 'calc(var(--u) * 9)', fontFamily: 'monospace', fontWeight: 900, letterSpacing: '.3em', textAlign: 'center', width: '7em', maxWidth: 'calc(var(--uw) * 90)', padding: '.2em', borderRadius: 'calc(var(--u) * 1)', border: '3px solid #b58cff', background: '#26173f', color: '#fff', outline: 'none' }} />
+      <button disabled={busy || code.length !== 6} style={{ fontSize: 'calc(var(--u) * 4)', fontWeight: 800, padding: '.5em 1.6em', borderRadius: 'calc(var(--u) * 1)', background: '#b58cff', color: '#1b0c30', opacity: busy || code.length !== 6 ? 0.5 : 1 }}>{busy ? 'Pareando...' : 'Parear tela'}</button>
       {error && <p role="alert" style={{ fontSize: 'calc(var(--u) * 3)', color: '#fca5a5', maxWidth: 'calc(var(--uw) * 80)' }}>{error}</p>}
     </form>
   );
@@ -288,13 +288,13 @@ export default function Player() {
     const [w, h] = syncRef.current?.screen.orientation === 'V' ? [540, 960] : [960, 540];
     c.width = w; c.height = h;
     const g = c.getContext('2d')!;
-    g.fillStyle = '#0b1120'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#1b0c30'; g.fillRect(0, 0, w, h);
     try {
       if (el) g.drawImage(el, 0, 0, w, h); else throw new Error('sem midia');
       shot.current = c.toDataURL('image/jpeg', 0.6);
     } catch { // conteudo externo nao pode ser copiado: registra apenas o nome do que esta no ar
-      g.fillStyle = '#0b1120'; g.fillRect(0, 0, w, h);
-      g.fillStyle = '#f9c21a'; g.font = 'bold 30px sans-serif'; g.textAlign = 'center';
+      g.fillStyle = '#1b0c30'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#b58cff'; g.font = 'bold 30px sans-serif'; g.textAlign = 'center';
       g.fillText('No ar agora:', w / 2, h / 2 - 20);
       g.fillStyle = '#fff'; g.fillText(stage.current?.dataset.name || '—', w / 2, h / 2 + 30);
       shot.current = c.toDataURL('image/jpeg', 0.6);
@@ -368,8 +368,8 @@ export default function Player() {
         <>
           <div ref={stage} data-name={cur?.media.name ?? ''} style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             {cur && sync ? <Stage cur={cur} sync={sync} api={api} next={next} /> : (
-              <div style={{ ...center, background: '#0b1120' }}>
-                <p style={{ fontSize: 'calc(var(--u) * 6)', fontWeight: 900 }}>Yes<span style={{ color: '#f9c21a' }}>DOOH</span></p>
+              <div style={{ ...center, background: '#1b0c30' }}>
+                <p style={{ fontSize: 'calc(var(--u) * 6)', fontWeight: 900 }}>Yes<span style={{ color: '#b58cff' }}>DOOH</span></p>
                 <p style={{ fontSize: 'calc(var(--u) * 3)', opacity: 0.7 }}>{!sync ? 'Carregando programação...' : sync.slots.length ? 'Nenhum conteúdo programado para este horário.' : `${sync.screen.name}: adicione conteúdos à playlist no painel.`}</p>
               </div>
             )}

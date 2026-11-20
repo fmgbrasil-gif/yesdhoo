@@ -36,7 +36,7 @@ export async function afterPlatformInvoiceChange(clientId: string) {
 /** Tons da cor da marca para o painel (variaveis CSS usadas pelo Tailwind). */
 export function brandCss(hex: string) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  const base = m ? m[1] : 'f0b000';
+  const base = m ? m[1] : '8a52f8';
   const rgb = [0, 2, 4].map((i) => parseInt(base.slice(i, i + 2), 16));
   const mix = (t: number[], w: number) => rgb.map((c, i) => Math.round(c + (t[i] - c) * w));
   const white = [255, 255, 255], black = [0, 0, 0];

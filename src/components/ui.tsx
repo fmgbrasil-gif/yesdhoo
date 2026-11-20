@@ -166,7 +166,7 @@ export function MultiPicker({ name, options, defaultValue = [], placeholder = 'B
         {list.length === 0 && <p className="p-2 text-sm text-ink-400">{emptyHint || 'Nada encontrado.'}</p>}
         {list.map((o) => (
           <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-ink-50 dark:hover:bg-ink-700">
-            <input type="checkbox" checked={sel.includes(o.id)} onChange={() => toggle(o.id)} className="h-4 w-4 accent-amber-500" />
+            <input type="checkbox" checked={sel.includes(o.id)} onChange={() => toggle(o.id)} className="h-4 w-4 accent-violet-500" />
             <span className="flex-1 truncate">{o.label}</span>
             {o.sub && <span className="text-xs text-ink-400">{o.sub}</span>}
           </label>

@@ -32,7 +32,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
           const on = [...new Set(m.items.map((i) => i.screenId))];
           return (
             <article key={m.id} className="card overflow-hidden">
-              <div className="flex aspect-video flex-col items-center justify-center gap-2 p-5 text-center" style={{ background: cfg.bg ?? '#0b1120', color: cfg.textColor ?? cfg.color ?? '#fff' }}>
+              <div className="flex aspect-video flex-col items-center justify-center gap-2 p-5 text-center" style={{ background: cfg.bg ?? '#1b0c30', color: cfg.textColor ?? cfg.color ?? '#fff' }}>
                 <p className="text-lg font-black leading-tight" style={{ color: cfg.titleColor ?? cfg.color }}>{cfg.title ?? m.name}</p>
                 <p className="line-clamp-3 text-xs opacity-90">{cfg.text ?? MEDIA_TYPES[m.type]}</p>
               </div>

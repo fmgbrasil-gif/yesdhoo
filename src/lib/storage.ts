@@ -17,7 +17,8 @@ export const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR || 'storage');
 const BLOB_HOST = /^https:\/\/[a-z0-9]+\.public\.blob\.vercel-storage\.com\//;
 
 export const isRemoteKey = (key?: string | null): key is string => !!key && BLOB_HOST.test(key);
-export const fileUrl = (key?: string | null) => (!key ? null : isRemoteKey(key) ? key : `/api/arquivos/${key}`);
+// '/brand/...' sao imagens fixas do proprio sistema (pasta public/brand), como a logo da plataforma
+export const fileUrl = (key?: string | null) => (!key ? null : isRemoteKey(key) || /^\/brand\/[\w.-]+$/.test(key) ? key : `/api/arquivos/${key}`);
 
 export function storagePath(key: string) {
   const p = path.resolve(STORAGE_DIR, key);

@@ -21,7 +21,7 @@ function TenantFields({ t, fee, dueDay }: { t?: Tenant; fee?: number | null; due
         <Field label="CNPJ"><input name="document" defaultValue={t?.document ?? ''} className="input" inputMode="numeric" /></Field>
         <Field label="Endereço de acesso" hint="Usado em /login?empresa=..."><input name="slug" defaultValue={t?.slug ?? ''} className="input" placeholder="gerado a partir do nome" /></Field>
         <Field label="Limite de telas do plano"><input type="number" name="planScreens" min={1} defaultValue={t?.planScreens ?? 10} className="input" /></Field>
-        <Field label="Cor da marca"><input type="color" name="color" defaultValue={t?.color ?? '#f0b000'} className="h-10 w-full rounded-lg" /></Field>
+        <Field label="Cor da marca"><input type="color" name="color" defaultValue={t?.color ?? '#8a52f8'} className="h-10 w-full rounded-lg" /></Field>
         <Field label="Logo" hint="PNG, JPG ou WEBP até 2 MB"><input type="file" name="logo" accept="image/png,image/jpeg,image/webp" className="input" /></Field>
       </div>
       <div className="grid gap-3 rounded-lg bg-ink-50 p-3 sm:grid-cols-3 dark:bg-ink-900">
