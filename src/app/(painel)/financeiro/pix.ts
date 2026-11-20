@@ -9,7 +9,7 @@ import { pixFileName } from '@/lib/doc-names';
 
 export type PixData =
   | { ok: false; error: string }
-  | { ok: true; payload: string; qr: string; amount: string; due: string; ref: string; clientName: string; phone: string | null; link: string; pixLink: string; pixFile: string; whatsappText: string };
+  | { ok: true; payload: string; qr: string; amount: string; due: string; ref: string; clientName: string; phone: string | null; link: string; payLink: string; pixLink: string; pixFile: string; whatsappText: string };
 
 /** Pix Copia e Cola de uma fatura em aberto, com QR Code e a mensagem pronta para o WhatsApp do cliente. */
 export async function invoicePixData(id: string, origin: string): Promise<PixData> {
@@ -24,19 +24,22 @@ export async function invoicePixData(id: string, origin: string): Promise<PixDat
   const link = base + invoiceLink(inv);
   const ref = inv.competence ? competenceLabel(inv.competence) : `vencimento ${fmtDate(inv.dueDate)}`;
   const name = inv.client.tradeName || inv.client.name;
+  const payLink = `${link}/pagar`;
+  // o link de pagamento vem primeiro: ele abre a pagina com o botao "Copiar codigo Pix"
   const whatsappText = [
     `Olá, ${name}! Segue o Pix da fatura nº ${inv.number} (${ref}) de ${user.tenant.tradeName || user.tenant.name}.`,
-    `Valor: ${fmtMoney(inv.amountCents)} · Vencimento: ${fmtDate(inv.dueDate)}`,
+    `Valor: *${fmtMoney(inv.amountCents)}* · Vencimento: ${fmtDate(inv.dueDate)}`,
     '',
-    'Pix Copia e Cola:',
+    '👉 Toque no link para *copiar o código Pix* com um clique:',
+    payLink,
+    '',
+    'Se preferir, copie o código Pix Copia e Cola abaixo:',
     payload,
-    '',
-    `Fatura completa: ${link}`,
   ].join('\n');
   const digits = (inv.client.phone1 ?? '').replace(/\D/g, '');
   return {
     ok: true, payload, qr, amount: fmtMoney(inv.amountCents), due: fmtDate(inv.dueDate), ref, clientName: inv.client.name,
     phone: digits.length >= 10 ? (digits.startsWith('55') && digits.length >= 12 ? digits : `55${digits}`) : null,
-    link, pixLink: `${link}/pix`, pixFile: pixFileName(inv, inv.client), whatsappText,
+    link, payLink, pixLink: `${link}/pix`, pixFile: pixFileName(inv, inv.client), whatsappText,
   };
 }

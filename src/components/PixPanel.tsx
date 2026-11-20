@@ -13,6 +13,8 @@ export function PixPanel({ invoiceId }: { invoiceId: string }) {
   if (!data) return <p className="flex items-center gap-2 text-sm text-ink-400"><Loader2 size={15} className="animate-spin" /> Gerando o Pix...</p>;
   if (!data.ok) return <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-200" role="alert">{data.error}</p>;
   const wa = `https://wa.me/${data.phone ?? ''}?text=${encodeURIComponent(data.whatsappText)}`;
+  // so o codigo, numa mensagem separada: o cliente segura o dedo e copia exatamente o Pix
+  const waCode = `https://wa.me/${data.phone ?? ''}?text=${encodeURIComponent(data.payload)}`;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
@@ -31,8 +33,11 @@ export function PixPanel({ invoiceId }: { invoiceId: string }) {
         <CopyButton text={data.payload} label="Copiar código Pix" />
         <CopyButton text={data.whatsappText} label="Copiar mensagem" />
         <a href={wa} target="_blank" rel="noreferrer" className="btn bg-emerald-600 text-white hover:bg-emerald-500"><MessageCircle size={15} /> Enviar pelo WhatsApp</a>
+        <a href={waCode} target="_blank" rel="noreferrer" className="btn-ghost" title="Envia só o código, numa mensagem separada, para o cliente copiar segurando o dedo"><MessageCircle size={15} /> Enviar só o código</a>
+        <a href={data.payLink} target="_blank" rel="noreferrer" className="btn-ghost"><ExternalLink size={15} /> Página de pagamento</a>
         <a href={`${data.pixLink}`} target="_blank" rel="noreferrer" className="btn-ghost"><ExternalLink size={15} /> Documento do Pix</a>
       </div>
+      <p className="text-xs text-ink-400">A mensagem leva o cliente à página de pagamento, onde um toque copia o código Pix. Use <b>Enviar só o código</b> logo depois para mandar o código numa mensagem separada, fácil de copiar.</p>
       {!data.phone && <p className="text-xs text-ink-400">O cadastro do cliente não tem celular: o WhatsApp abre para você escolher o contato.</p>}
     </div>
   );
