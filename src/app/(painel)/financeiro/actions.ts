@@ -7,10 +7,9 @@ import { db } from '@/lib/db';
 import { str } from '@/lib/util';
 import { parseMoney } from '@/lib/money';
 import { BankError } from '@/lib/bank/asaas';
-import { cancelBoleto, cancelSubscription, competenceLabel, createInvoice, createSubscription, dueFor, issueBoleto, itemsTotal, markPaid, METHODS, syncBoleto, type InvoiceItem } from '@/lib/billing';
+import { cancelBoleto, cancelSubscription, competenceLabel, dueFor, issueBoleto, itemsTotal, markPaid, METHODS, syncBoleto } from '@/lib/billing';
 import { localDate } from '@/lib/util';
-import { ContractError, draftContract, type Attachment } from '@/lib/ai-contract';
-import { isUpload } from '@/lib/storage';
+import { chargeFromForm, contractFromForm, readItems } from '@/lib/charges';
 import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
 
@@ -20,54 +19,14 @@ async function ownInvoice(tenantId: string, id: string) {
   return db.invoice.findFirst({ where: { id, tenantId }, include: { client: true } });
 }
 
-function readItems(fd: FormData): InvoiceItem[] | string {
-  let raw: { description?: string; quantity?: string; unit?: string; price?: string }[];
-  try { raw = JSON.parse(String(fd.get('items') || '[]')); } catch { return 'Itens inválidos.'; }
-  const items: InvoiceItem[] = [];
-  for (const r of raw) {
-    const description = String(r.description ?? '').trim().slice(0, 200);
-    const quantity = Number(String(r.quantity ?? '1').replace(',', '.'));
-    const unitCents = parseMoney(r.price);
-    const unit = String(r.unit ?? '').trim().slice(0, 12) || 'un';
-    if (!description && !unitCents) continue;
-    if (!description) return 'Preencha a descrição de todos os itens.';
-    if (!Number.isFinite(quantity) || quantity <= 0) return `Quantidade inválida em “${description}”.`;
-    if (unitCents == null) return `Valor inválido em “${description}”. Use o formato 1.500,00.`;
-    if (!unitCents) return `Informe o valor de “${description}”.`;
-    items.push({ description, unit, quantity, unitCents });
-  }
-  if (!items.length) return 'Inclua ao menos um item na fatura.';
-  return items;
-}
 
 /** Nova cobranca: avulsa (uma fatura), por periodo (N meses, todas as faturas de uma vez) ou recorrente (todo mes ate cancelar). */
 export async function saveCharge(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
-  const client = await db.client.findFirst({ where: { id: String(fd.get('clientId')), tenantId: user.tenantId } });
-  if (!client) return { error: 'Escolha o cliente.' };
-  if (!client.active) return { error: `${client.name} está desativado. Reative o cadastro antes de cobrar.` };
-  const items = readItems(fd);
-  if (typeof items === 'string') return { error: items };
-  if (items.reduce((a, i) => a + i.quantity * i.unitCents, 0) <= 0) return { error: 'O total precisa ser maior que zero.' };
-  const notes = str(fd, 'notes') ?? '';
-  const mode = String(fd.get('mode'));
-  if (mode === 'avulsa') {
-    const dueDate = str(fd, 'dueDate');
-    if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe a data de vencimento.' };
-    await createInvoice(user.tenantId, { clientId: client.id, items, dueDate, notes });
-    revalidatePath('/financeiro');
-    return { ok: true };
-  }
-  if (mode !== 'periodo' && mode !== 'recorrente') return { error: 'Escolha o tipo de cobrança.' };
-  const startMonth = str(fd, 'startMonth');
-  if (!startMonth || !/^\d{4}-\d{2}$/.test(startMonth)) return { error: 'Informe o mês da primeira cobrança.' };
-  const dueDay = Number(str(fd, 'dueDay'));
-  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return { error: 'O dia de vencimento deve ficar entre 1 e 28.' };
-  const months = Number(str(fd, 'months'));
-  if (mode === 'periodo' && (!Number.isInteger(months) || months < 2 || months > 60)) return { error: 'O período deve ter entre 2 e 60 meses.' };
-  await createSubscription(user.tenantId, { clientId: client.id, mode, items, dueDay, startMonth, months: mode === 'periodo' ? months : undefined, notes });
+  const r = await chargeFromForm(user, fd);
+  if ('error' in r) return { error: r.error };
   revalidatePath('/financeiro');
-  return { ok: true, message: mode === 'periodo' ? `${months} faturas geradas.` : 'Cobrança recorrente criada. As faturas serão geradas todo mês automaticamente.' };
+  return { ok: true, message: r.message };
 }
 
 export async function cancelCharge(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -82,33 +41,9 @@ export async function cancelCharge(_: ActionResult, fd: FormData): Promise<Actio
 /** Gera o contrato com IA e abre a pagina dele para revisar. */
 export async function generateContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
-  const client = await db.client.findFirst({ where: { id: String(fd.get('clientId')), tenantId: user.tenantId } });
-  if (!client) return { error: 'Escolha o cliente.' };
-  const subId = str(fd, 'subscriptionId');
-  const sub = subId ? await db.subscription.findFirst({ where: { id: subId, tenantId: user.tenantId, clientId: client.id } }) : null;
-  if (subId && !sub) return { error: 'Cobrança não encontrada para este cliente.' };
-  const screens = (await db.screen.findMany({
-    where: { tenantId: user.tenantId, OR: [{ clientId: client.id }, { items: { some: { media: { clientId: client.id } } } }] },
-    select: { name: true, city: true, state: true }, orderBy: { name: 'asc' }, take: 30,
-  })).map((s) => [s.name, s.city && `${s.city}${s.state ? '/' + s.state : ''}`].filter(Boolean).join(' — '));
-  // anexos opcionais: PDF ou imagens, ate 5 arquivos e 4 MB no total (limite de envio do servidor)
-  const files = fd.getAll('attachments').filter(isUpload);
-  const ALLOWED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-  if (files.length > 5) return { error: 'Anexe no máximo 5 arquivos.' };
-  if (files.reduce((a, f) => a + f.size, 0) > 4 * 1024 * 1024) return { error: 'Os anexos passam de 4 MB. Envie arquivos menores ou menos arquivos.' };
-  const bad = files.find((f) => !ALLOWED.includes(f.type));
-  if (bad) return { error: `“${bad.name}” não é PDF nem imagem (PNG, JPG, WEBP ou GIF).` };
-  const attachments: Attachment[] = await Promise.all(files.map(async (f) => ({ name: f.name, mime: f.type, data: Buffer.from(await f.arrayBuffer()).toString('base64') })));
-  let body: string;
-  try {
-    body = await draftContract(user.tenant, client, sub, String(fd.get('extra') ?? ''), screens, attachments);
-  } catch (e) {
-    if (e instanceof ContractError) return { error: e.message };
-    throw e;
-  }
-  const title = `Contrato — ${client.name}${sub ? ` (${sub.mode === 'periodo' ? `${sub.months} meses` : 'recorrente'})` : ''}`;
-  const contract = await db.contract.create({ data: { tenantId: user.tenantId, clientId: client.id, subscriptionId: sub?.id ?? null, title, body } });
-  redirect(`/contratos/${contract.id}`);
+  const r = await contractFromForm(user, fd);
+  if ('error' in r) return { error: r.error };
+  redirect(`/contratos/${r.contract.id}`);
 }
 
 export async function saveContract(_: ActionResult, fd: FormData): Promise<ActionResult> {

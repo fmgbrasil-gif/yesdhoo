@@ -4,7 +4,7 @@ import { ActionForm, Field } from '@/components/ui';
 import { Logo } from '@/components/Logo';
 import { login } from './actions';
 import { db } from '@/lib/db';
-import { fileUrl } from '@/lib/storage';
+import { fileUrl, isBrandLogo, logoOnDark } from '@/lib/storage';
 import { brandCss } from '@/lib/tenant';
 import { DevCredit } from '@/components/Brand';
 
@@ -21,8 +21,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <section className="hidden flex-col justify-between bg-ink-900 p-12 text-white lg:flex">
         {company ? (
           <span className="flex items-center gap-3">
-            {company.logo && <img src={fileUrl(company.logo)!} alt="" className="h-12 w-12 rounded-lg bg-white object-contain p-1" />}{/* eslint-disable-line @next/next/no-img-element */}
-            <span className="text-lg font-bold">{company.name}</span>
+            {company.logo && isBrandLogo(company.logo)
+              ? <img src={logoOnDark(fileUrl(company.logo))!} alt={company.name} className="h-20 w-auto" /> /* eslint-disable-line @next/next/no-img-element */
+              : <>{company.logo && <img src={fileUrl(company.logo)!} alt="" className="h-12 w-12 rounded-lg bg-white object-contain p-1" />}<span className="text-lg font-bold">{company.name}</span></>}{/* eslint-disable-line @next/next/no-img-element */}
           </span>
         ) : <Logo />}
         <div>
@@ -34,7 +35,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <section className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="mb-8 inline-flex items-center gap-3 rounded-xl bg-ink-900 p-3 lg:hidden">
-            {company ? <>{company.logo && <img src={fileUrl(company.logo)!} alt="" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5" />}<span className="font-bold text-white">{company.name}</span></> : <Logo />}{/* eslint-disable-line @next/next/no-img-element */}
+            {company ? (company.logo && isBrandLogo(company.logo)
+              ? <img src={logoOnDark(fileUrl(company.logo))!} alt={company.name} className="h-10 w-auto" />
+              : <>{company.logo && <img src={fileUrl(company.logo)!} alt="" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5" />}<span className="font-bold text-white">{company.name}</span></>) : <Logo />}{/* eslint-disable-line @next/next/no-img-element */}
           </div>
           <h1 className="mb-1">Entrar</h1>
           <p className="mb-6 text-sm text-ink-400">Acesse o painel com seu e-mail e senha.</p>

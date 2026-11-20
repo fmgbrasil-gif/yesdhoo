@@ -6,6 +6,8 @@ import { fileUrl } from '@/lib/storage';
 import { PageHeader } from '@/components/basic';
 import { ActionForm, Confirm, Field, Tabs } from '@/components/ui';
 import { deleteContract, saveContract } from '../../financeiro/actions';
+import { DownloadContractPdf } from '@/components/PdfButtons';
+import { contractFileName } from '@/lib/doc-names';
 
 /** Linhas de clausula e titulos em destaque; o resto como paragrafo. */
 function ContractText({ body }: { body: string }) {
@@ -23,18 +25,20 @@ function ContractText({ body }: { body: string }) {
   );
 }
 
-export default async function ContratoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContratoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ baixar?: string }> }) {
   const { id } = await params;
+  const auto = (await searchParams).baixar === '1';
   const user = await requireAdmin();
   const c = await db.contract.findFirst({ where: { id, tenantId: user.tenantId }, include: { client: true } });
   if (!c) notFound();
   return (
     <>
       <PageHeader title={c.title} crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Contratos', href: '/financeiro?aba=contratos' }, { label: c.client.name }]}>
+        <DownloadContractPdf body={c.body} fileName={contractFileName(c.client)} logo={fileUrl(user.tenant.logo)} auto={auto} />
         <Confirm trigger={<><Trash2 size={15} /> Excluir</>} triggerClass="btn-ghost !text-red-600" titleAttr="Excluir contrato" title="Excluir este contrato?" text="O texto do contrato será apagado. As cobranças do cliente não mudam." confirmLabel="Sim, excluir" action={deleteContract} fields={{ id: c.id }} />
       </PageHeader>
       <p className="mb-4 max-w-3xl rounded-lg bg-brand-50 p-3 text-sm text-ink-700 print:hidden dark:bg-ink-800 dark:text-ink-200">
-        Texto redigido por IA a partir do cadastro e das condições da cobrança. <b>Revise com atenção</b>, preencha os campos marcados com [PREENCHER] e, se possível, peça a validação de um advogado antes de assinar. Para gerar o PDF, use Imprimir no navegador (Ctrl + P).
+        Texto redigido por IA a partir do cadastro e das condições da cobrança. <b>Revise com atenção</b>, preencha os campos marcados com [PREENCHER] e, se possível, peça a validação de um advogado antes de assinar. Use “Baixar PDF” para salvar o arquivo.
       </p>
       <Tabs tabs={[
         { label: 'Visualizar', content: (

@@ -9,6 +9,8 @@ import { addressLine, fmtCep, fmtDoc, moneyInWords } from '@/lib/docs';
 import { invoiceItems, invoicePix, invoiceState, METHODS } from '@/lib/billing';
 import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
+import { DownloadDocPdf } from '@/components/PdfButtons';
+import { invoiceFileName } from '@/lib/doc-names';
 
 export const metadata: Metadata = { title: 'Fatura', robots: { index: false, follow: false } };
 
@@ -31,8 +33,9 @@ function Cell({ label, children, style, valueStyle, colSpan }: { label: string; 
 }
 
 /** Fatura publica: o cliente abre pelo link (sem login), confere, imprime e paga com Pix ou boleto. */
-export default async function FaturaPage({ params }: { params: Promise<{ token: string }> }) {
+export default async function FaturaPage({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ baixar?: string }> }) {
   const { token } = await params;
+  const auto = (await searchParams).baixar === '1';
   if (!/^[\w-]{20,40}$/.test(token)) notFound();
   const inv = await db.invoice.findUnique({ where: { publicToken: token }, include: { client: true, tenant: true, subscription: true } });
   if (!inv) notFound();
@@ -65,7 +68,7 @@ export default async function FaturaPage({ params }: { params: Promise<{ token: 
           <h1 className="text-lg font-bold text-gray-800">Fatura nº {number}</h1>
           <p className="text-xs text-gray-500">{displayName} · vencimento {fmtDate(inv.dueDate)} · {fmtMoney(inv.amountCents)}</p>
         </div>
-        <PrintButton />
+        <div className="flex gap-2"><DownloadDocPdf fileName={invoiceFileName(inv, c)} auto={auto} /><PrintButton /></div>
       </div>
 
       {/* Pix em destaque na tela, antes da folha */}
@@ -82,7 +85,7 @@ export default async function FaturaPage({ params }: { params: Promise<{ token: 
       )}
 
       <div className="overflow-x-auto print:overflow-visible">
-        <div className="relative mx-auto flex h-[297mm] w-[210mm] flex-col overflow-hidden bg-white shadow-xl print:m-0 print:shadow-none" style={{ padding: '6mm 8mm', fontSize: '10px' }}>
+        <div id="doc" className="relative mx-auto flex h-[297mm] w-[210mm] flex-col overflow-hidden bg-white shadow-xl print:m-0 print:shadow-none" style={{ padding: '6mm 8mm', fontSize: '10px' }}>
           {stamp && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%) rotate(-35deg)', fontSize: '90px', fontWeight: 'bold', color: stamp.color, letterSpacing: '15px', pointerEvents: 'none', zIndex: 10, whiteSpace: 'nowrap', userSelect: 'none' }}>{stamp.text}</div>
           )}

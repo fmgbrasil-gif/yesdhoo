@@ -73,3 +73,9 @@ export async function videoThumb(key: string) {
     return null;
   }
 }
+
+/** Logos fixas do sistema que tem versao clara para fundo escuro (menu lateral, tela de login). */
+const ON_DARK: Record<string, string> = { '/brand/yes.png': '/brand/yes-white.png' };
+export const logoOnDark = (url: string | null) => (url ? ON_DARK[url] ?? url : null);
+/** Logo "larga" do sistema (sem caixa branca e sem o nome ao lado). */
+export const isBrandLogo = (url: string | null) => !!url && url.startsWith('/brand/');

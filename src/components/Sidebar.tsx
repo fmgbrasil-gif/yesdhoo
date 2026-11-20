@@ -8,12 +8,11 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
-import { DevCredit } from './Brand';
 
 type Notif = { id: string; message: string; link: string | null; read: boolean };
 type Props = {
   user: { name: string; email: string; image: string | null; role: string; superAdmin: boolean };
-  company: { name: string; logo: string | null };
+  company: { name: string; logo: string | null; brand?: boolean };
   favorites: { id: string; name: string; online: boolean }[];
   notifications: Notif[];
   logout: () => Promise<void>;
@@ -74,7 +73,9 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
       <aside className={`fixed inset-y-0 left-0 z-40 flex ${mini ? 'lg:w-[76px]' : 'lg:w-64'} w-72 flex-col bg-ink-900 text-ink-200 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${open ? '' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 py-5">
           <Link href="/dashboard" aria-label="Início" className="flex min-w-0 items-center gap-2">
-            {company.logo
+            {company.logo && company.brand
+              ? <img src={company.logo} alt={company.name} className={`${mini ? 'h-9' : 'h-14'} w-auto max-w-[190px] object-contain`} /> /* eslint-disable-line @next/next/no-img-element */
+              : company.logo
               ? <><img src={company.logo} alt="" className="h-11 w-11 shrink-0 rounded-lg bg-white object-contain p-0.5" />{!mini && <span className="truncate text-sm font-bold text-white">{company.name}</span>}</> /* eslint-disable-line @next/next/no-img-element */
               : <Logo compact={mini} />}
           </Link>
@@ -123,7 +124,6 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
             </span>
           </Link>
         </div>
-        <div className={`border-t border-ink-800 px-4 py-2 ${mini ? 'lg:hidden' : ''}`}><DevCredit dark /></div>
       </aside>
       {bell && (
         <div className="fixed inset-0 z-50" onClick={() => setBell(false)}>

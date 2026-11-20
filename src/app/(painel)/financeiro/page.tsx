@@ -11,6 +11,7 @@ import { ChargeFields } from '@/components/ChargeForm';
 import { boletoInvoice, cancelCharge, cancelInvoice, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice, updateCharge, updateInvoice } from './actions';
 import { InvoiceItems } from '@/components/InvoiceItems';
 import { MoneyInput } from '@/components/MoneyInput';
+import { PixButton } from '@/components/PixPanel';
 
 // a geracao de contrato com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
@@ -89,11 +90,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             <p className="text-xs text-ink-400">Os dados da sua empresa (Minha empresa) e do cliente (Clientes e parceiros) entram no contrato automaticamente.</p>
           </ActionForm>
         </Modal>
-        <Modal trigger={<><Plus size={16} /> Nova cobrança</>} title="Nova cobrança" wide>
-          <ActionForm action={saveCharge} submit="Criar cobrança">
-            <ChargeFields clients={clients} today={today} services={services} />
-          </ActionForm>
-        </Modal>
+        <Link href="/financeiro/nova" className="btn-primary"><Plus size={16} /> Nova cobrança</Link>
       </PageHeader>
 
       {noPix && <p className="mb-4 rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-800 dark:text-ink-200">Cadastre sua chave Pix em <Link href="/empresa#cobranca" className="font-semibold underline">Minha empresa</Link> para que as faturas saiam com QR Code de pagamento.</p>}
@@ -212,6 +209,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                           <Link href={invoiceLink(inv)} target="_blank" className="btn-icon" title="Abrir fatura (link para o cliente)" aria-label="Abrir fatura"><FileText size={15} /></Link>
                           {inv.status === 'aberta' && (
                             <>
+                              <PixButton invoiceId={inv.id} number={inv.number} />
                               <Modal trigger={<CheckCircle2 size={15} />} triggerClass="btn-icon !text-emerald-600" titleAttr="Registrar pagamento" title={`Registrar pagamento — fatura ${inv.number}`}>
                                 <ActionForm action={payInvoice} submit="Confirmar pagamento">
                                   <input type="hidden" name="id" value={inv.id} />
