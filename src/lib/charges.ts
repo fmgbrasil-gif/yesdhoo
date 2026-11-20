@@ -30,6 +30,18 @@ export function readItems(fd: FormData): InvoiceItem[] | string {
   return items;
 }
 
+/** Cadastra no catalogo de servicos as descricoes novas usadas na cobranca (com unidade e valor), para escolher nas proximas. */
+export async function rememberServices(tenantId: string, items: InvoiceItem[]) {
+  const existing = await db.service.findMany({ where: { tenantId }, select: { name: true } });
+  const known = new Set(existing.map((s) => s.name.trim().toLowerCase()));
+  for (const it of items) {
+    const key = it.description.trim().toLowerCase();
+    if (known.has(key)) continue;
+    known.add(key);
+    await db.service.create({ data: { tenantId, name: it.description.trim().slice(0, 120), unit: it.unit ?? 'un', priceCents: it.unitCents } });
+  }
+}
+
 type ChargeResult = { error: string } | { message: string; invoiceId: string | null; subscriptionId: string | null; clientId: string };
 
 /** Valida o formulario e cria a cobranca. Devolve a primeira fatura gerada (para o fluxo de envio). */
@@ -45,6 +57,7 @@ export async function chargeFromForm(user: SessionUser, fd: FormData): Promise<C
   if (mode === 'avulsa') {
     const dueDate = str(fd, 'dueDate');
     if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe a data de vencimento.' };
+    await rememberServices(user.tenantId, items);
     const inv = await createInvoice(user.tenantId, { clientId: client.id, items, dueDate, notes });
     return { message: 'Fatura criada.', invoiceId: inv.id, subscriptionId: null, clientId: client.id };
   }
@@ -55,6 +68,7 @@ export async function chargeFromForm(user: SessionUser, fd: FormData): Promise<C
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return { error: 'O dia de vencimento deve ficar entre 1 e 28.' };
   const months = Number(str(fd, 'months'));
   if (mode === 'periodo' && (!Number.isInteger(months) || months < 2 || months > 60)) return { error: 'O período deve ter entre 2 e 60 meses.' };
+  await rememberServices(user.tenantId, items);
   const sub = await createSubscription(user.tenantId, { clientId: client.id, mode, items, dueDay, startMonth, months: mode === 'periodo' ? months : undefined, notes });
   const first = await db.invoice.findFirst({ where: { subscriptionId: sub.id }, orderBy: { dueDate: 'asc' } });
   return {

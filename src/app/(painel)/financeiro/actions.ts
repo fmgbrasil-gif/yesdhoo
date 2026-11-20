@@ -9,7 +9,7 @@ import { parseMoney } from '@/lib/money';
 import { BankError } from '@/lib/bank/asaas';
 import { cancelBoleto, cancelSubscription, competenceLabel, dueFor, issueBoleto, itemsTotal, markPaid, METHODS, syncBoleto } from '@/lib/billing';
 import { localDate } from '@/lib/util';
-import { chargeFromForm, contractFromForm, readItems } from '@/lib/charges';
+import { chargeFromForm, contractFromForm, readItems, rememberServices } from '@/lib/charges';
 import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
 
@@ -166,6 +166,7 @@ export async function updateCharge(_: ActionResult, fd: FormData): Promise<Actio
   const dueDay = Number(str(fd, 'dueDay'));
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return { error: 'O dia de vencimento deve ficar entre 1 e 28.' };
   const notes = str(fd, 'notes') ?? '';
+  await rememberServices(user.tenantId, items);
   const updated = await db.subscription.update({ where: { id: sub.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDay, notes } });
   let changed = 0;
   if (fd.get('applyOpen') === 'on') {

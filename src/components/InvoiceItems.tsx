@@ -22,6 +22,11 @@ export function InvoiceItems({ initial, services: initialServices = [] }: { init
   const [draft, setDraft] = useState({ name: '', unit: 'mês', price: '0,00' });
   const [msg, setMsg] = useState('');
   const set = (i: number, k: keyof Row, v: string) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  // descricao igual a um servico cadastrado (escolhido na lista): preenche unidade e valor
+  const setDescription = (i: number, v: string) => {
+    const s = services.find((x) => x.name.trim().toLowerCase() === v.trim().toLowerCase());
+    setRows(rows.map((r, j) => (j === i ? (s ? { ...r, description: s.name, unit: s.unit, unit_price: centsToText(s.priceCents) } : { ...r, description: v }) : r)));
+  };
   const total = rows.reduce((a, r) => a + Math.round((Number(r.quantity.replace(',', '.')) || 0) * cents(r.unit_price)), 0);
 
   const addService = (s: ServiceOpt) => {
@@ -48,11 +53,12 @@ export function InvoiceItems({ initial, services: initialServices = [] }: { init
 
   return (
     <div className="space-y-2">
+      <datalist id="servicos-cadastrados">{services.map((s) => <option key={s.id} value={s.name}>{`${brl(s.priceCents)} / ${s.unit}`}</option>)}</datalist>
       <input type="hidden" name="items" value={JSON.stringify(rows.map((r) => ({ description: r.description, unit: r.unit, quantity: r.quantity, price: r.unit_price })))} />
       <div className="hidden grid-cols-[1fr_70px_60px_130px_28px] gap-2 sm:grid"><span className="label">Descrição</span><span className="label">Unid.</span><span className="label">Qtd.</span><span className="label">Valor unit.</span></div>
       {rows.map((r, i) => (
         <div key={i} className="grid grid-cols-[1fr_70px_60px_130px_28px] gap-2">
-          <input className="input" aria-label="Descrição" value={r.description} onChange={(e) => set(i, 'description', e.target.value)} placeholder="Ex.: Veiculação — 4 telas" />
+          <input className="input" aria-label="Descrição" list="servicos-cadastrados" autoComplete="off" value={r.description} onChange={(e) => setDescription(i, e.target.value)} placeholder={services.length ? 'Escolha um serviço ou digite um novo' : 'Ex.: Veiculação — 4 telas'} />
           <input className="input" aria-label="Unidade" value={r.unit} onChange={(e) => set(i, 'unit', e.target.value)} />
           <input className="input" aria-label="Quantidade" inputMode="decimal" value={r.quantity} onChange={(e) => set(i, 'quantity', e.target.value)} />
           <MoneyInput label="Valor unitário" value={r.unit_price} onChange={(v) => set(i, 'unit_price', v)} />
@@ -69,6 +75,7 @@ export function InvoiceItems({ initial, services: initialServices = [] }: { init
       {picker && (
         <div className="space-y-3 rounded-lg border border-ink-100 bg-ink-50 p-3 dark:border-ink-700 dark:bg-ink-900">
           <p className="text-sm font-semibold">Serviços cadastrados</p>
+          <p className="text-xs text-ink-400">Descrições novas usadas numa cobrança entram aqui automaticamente.</p>
           {services.length === 0 && <p className="text-xs text-ink-400">Nenhum serviço ainda. Cadastre abaixo os serviços que você presta para usar nas cobranças.</p>}
           <ul className="max-h-48 space-y-1 overflow-y-auto">
             {services.map((s) => (
