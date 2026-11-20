@@ -29,7 +29,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
   const counts = await Promise.all(['cliente', 'parceiro', 'institucional'].map((o) => db.media.count({ where: { ...base, ...byOrigin(o) } })));
   const tabs: [string | undefined, string, number][] = [[undefined, 'Todas', counts[0] + counts[1] + counts[2]], ['cliente', 'Clientes', counts[0]], ['parceiro', 'Parceiros', counts[1]], ['institucional', 'Institucional', counts[2]]];
   const [rows, total, data] = await Promise.all([
-    db.media.findMany({ where, skip, take, orderBy: { updatedAt: 'desc' }, include: { client: { select: { name: true, kind: true } }, items: { select: { screenId: true } } } }),
+    db.media.findMany({ where, skip, take, orderBy: { updatedAt: 'desc' }, include: { client: { select: { name: true, kind: true, active: true } }, items: { select: { screenId: true } } } }),
     db.media.count({ where }),
     mediaFormData(user),
   ]);
@@ -78,6 +78,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
                       <td className="td text-ink-500">{m.type !== 'arquivo' ? 'Ambas' : [m.fileH && 'Horizontal', m.fileV && 'Vertical'].filter(Boolean).join(' + ')}</td>
                       <td className="td">
                         <span className={`badge ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-500'}`}>{m.active ? 'Ativa' : 'Inativa'}</span>
+                        {m.client && !m.client.active && <span className="badge ml-1 bg-red-100 text-red-700" title="O cadastro está desativado: não roda nas telas">Fora do ar</span>}
                         {m.endDate && <span className="block text-xs text-ink-400">até {m.endDate.split('-').reverse().join('/')}</span>}
                       </td>
                       <td className="td text-ink-500">{timeAgo(m.updatedAt)}</td>

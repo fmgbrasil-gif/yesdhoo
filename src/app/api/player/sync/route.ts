@@ -8,9 +8,13 @@ export async function GET(req: Request) {
   if (!screen) return unauthorized();
   const items = await db.playlistItem.findMany({
     where: { screenId: screen.id }, orderBy: { position: 'asc' },
-    include: { media: true, group: { include: { medias: { include: { media: true }, orderBy: { position: 'asc' } } } } },
+    include: {
+      media: { include: { client: { select: { active: true } } } },
+      group: { include: { medias: { include: { media: { include: { client: { select: { active: true } } } } }, orderBy: { position: 'asc' } } } },
+    },
   });
-  const ok = (m: { active: boolean } & Parameters<typeof isCompatible>[0]) => m.active && isCompatible(m, screen.orientation);
+  // midia inativa, de cliente/parceiro desativado ou sem arquivo na orientacao da tela nao vai ao ar
+  const ok = (m: { active: boolean; client: { active: boolean } | null } & Parameters<typeof isCompatible>[0]) => m.active && m.client?.active !== false && isCompatible(m, screen.orientation);
   const slots = items
     .map((it) => (it.media ? [it.media] : it.group?.active ? it.group.medias.map((g) => g.media) : []).filter(ok).map((m) => mediaForPlayer(m, screen.orientation)))
     .filter((s) => s.length);

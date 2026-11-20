@@ -9,6 +9,8 @@ import { parseMoney } from '@/lib/money';
 import { isUpload, removeFile, saveFile } from '@/lib/storage';
 import { passwordProblem } from '@/lib/security';
 import { enforceBilling } from '@/lib/tenant';
+import { cancelSubscription, createSubscription } from '@/lib/billing';
+import { localDate } from '@/lib/util';
 import type { ActionResult } from '@/components/ui';
 
 const COLOR = /^#[0-9a-f]{6}$/i;
@@ -54,11 +56,11 @@ export async function createTenant(_: ActionResult, fd: FormData): Promise<Actio
   if (logo.error) return { error: logo.error };
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
+  let billingId = '';
   await db.$transaction(async (tx) => {
     // a empresa vira um cliente da plataforma, para ser faturada pelo financeiro da plataforma
-    const billing = await tx.client.create({
-      data: { tenantId: me.tenantId, kind: 'cliente', type: 'PJ', name: f.name, document: f.document, email: adminEmail, monthlyFeeCents: f.monthlyFeeCents || null, dueDay: f.monthlyFeeCents ? f.dueDay : null },
-    });
+    const billing = await tx.client.create({ data: { tenantId: me.tenantId, kind: 'cliente', type: 'PJ', name: f.name, document: f.document, email: adminEmail } });
+    billingId = billing.id;
     await tx.tenant.create({
       data: {
         name: f.name, slug: f.slug, color: f.color, planScreens: f.planScreens, document: f.document, logo: logo.logo ?? null, autoBlockDays: f.autoBlockDays, billingClientId: billing.id,
@@ -66,6 +68,7 @@ export async function createTenant(_: ActionResult, fd: FormData): Promise<Actio
       },
     });
   });
+  await syncPlatformFee(me.tenantId, billingId, f.monthlyFeeCents || null, f.dueDay);
   revalidatePath('/plataforma');
   return { ok: true };
 }
@@ -77,7 +80,7 @@ async function ownTenant(id: string) {
 }
 
 export async function updateTenant(_: ActionResult, fd: FormData): Promise<ActionResult> {
-  await requireSuperAdmin();
+  const me = await requireSuperAdmin();
   const t = await ownTenant(String(fd.get('id')));
   const f = await readTenantFields(fd, t.id);
   if ('error' in f) return { error: f.error };
@@ -89,7 +92,8 @@ export async function updateTenant(_: ActionResult, fd: FormData): Promise<Actio
     data: { name: f.name, slug: f.slug, color: f.color, planScreens: f.planScreens, document: f.document, autoBlockDays: f.autoBlockDays, ...(logo.logo ? { logo: logo.logo } : {}) },
   });
   if (t.billingClientId) {
-    await db.client.update({ where: { id: t.billingClientId }, data: { name: f.name, document: f.document, monthlyFeeCents: f.monthlyFeeCents || null, dueDay: f.monthlyFeeCents ? f.dueDay : null } });
+    await db.client.update({ where: { id: t.billingClientId }, data: { name: f.name, document: f.document } });
+    await syncPlatformFee(me.tenantId, t.billingClientId, f.monthlyFeeCents || null, f.dueDay);
   }
   await enforceBilling(t.id);
   revalidatePath('/plataforma');
@@ -128,4 +132,17 @@ export async function resetTenantAdmin(_: ActionResult, fd: FormData): Promise<A
   await db.throttle.deleteMany({ where: { key: `login:${user.email}` } });
   revalidatePath('/plataforma');
   return { ok: true, message: `Senha provisória definida para ${user.email}. Ela será trocada no próximo acesso.` };
+}
+
+/** Cria, atualiza ou cancela a cobranca recorrente da mensalidade de uma empresa da plataforma. */
+async function syncPlatformFee(platformTenantId: string, clientId: string, feeCents: number | null, dueDay: number) {
+  const current = await db.subscription.findFirst({ where: { clientId, status: 'ativa', mode: 'recorrente' } });
+  const items = [{ description: 'Licença de uso da plataforma de mídia indoor', quantity: 1, unitCents: feeCents ?? 0 }];
+  if (!feeCents) { if (current) await cancelSubscription(current, { reason: 'Mensalidade removida', cancelOpen: false }); return; }
+  if (current) {
+    // vale para as proximas faturas; as ja geradas nao mudam
+    await db.subscription.update({ where: { id: current.id }, data: { amountCents: feeCents, dueDay, items: JSON.stringify(items) } });
+  } else {
+    await createSubscription(platformTenantId, { clientId, mode: 'recorrente', items, dueDay, startMonth: localDate().slice(0, 7) });
+  }
 }

@@ -37,6 +37,8 @@ model Tenant {
   invoiceNotes   String    @default("")
   users      User[]
   invoices   Invoice[]
+  subscriptions Subscription[]
+  contracts  Contract[]
   screens    Screen[]
   clients    Client[]
   medias     Media[]
@@ -110,13 +112,56 @@ model Client {
   zipcode      String?
   city         String?
   state        String?
-  monthlyFeeCents Int?    // mensalidade (gera fatura todo mes)
-  dueDay       Int?       // dia do vencimento
+  monthlyFeeCents Int?    // legado: mensalidade antiga, migrada para Subscription
+  dueDay       Int?       // legado
+  active       Boolean  @default(true) // inativo: as midias dele param de rodar nas telas
+  deactivatedAt DateTime?
   bankCustomerId String?  // cadastro do cliente no banco integrado
   createdAt    DateTime @default(now())
   medias       Media[]
   screens      Screen[]
   invoices     Invoice[]
+  subscriptions Subscription[]
+  contracts    Contract[]
+}
+
+// Cobranca que gera faturas mes a mes: por periodo (N meses, todas geradas de uma vez) ou recorrente (ate cancelar).
+model Subscription {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  mode         String    // periodo | recorrente
+  items        String    @default("[]")
+  amountCents  Int
+  dueDay       Int
+  startMonth   String    // YYYY-MM
+  months       Int?      // so no modo periodo
+  status       String    @default("ativa") // ativa | cancelada
+  cancelledAt  DateTime?
+  cancelReason String?
+  notes        String    @default("")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  invoices     Invoice[]
+  contracts    Contract[]
+  @@index([tenantId, status])
+}
+
+// Contrato de prestacao de servicos (redigido com IA a partir dos dados do cliente e da cobranca).
+model Contract {
+  id             String        @id @default(uuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  title          String
+  body           String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 // Fatura (conta a receber). Valores em centavos.
@@ -130,7 +175,10 @@ model Invoice {
   items        String    @default("[]") // JSON: [{ description, quantity, unitCents }]
   amountCents  Int
   dueDate      String    // YYYY-MM-DD
-  competence   String?   // YYYY-MM quando gerada pela mensalidade
+  competence   String?   // YYYY-MM quando gerada por uma cobranca recorrente ou por periodo
+  subscriptionId String?
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  installment  Int?      // numero da parcela (modo periodo)
   status       String    @default("aberta") // aberta | paga | cancelada
   paidAt       DateTime?
   paidCents    Int?
@@ -145,7 +193,7 @@ model Invoice {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   @@unique([tenantId, number])
-  @@unique([tenantId, clientId, competence])
+  @@unique([subscriptionId, competence])
   @@index([tenantId, status, dueDate])
 }
 

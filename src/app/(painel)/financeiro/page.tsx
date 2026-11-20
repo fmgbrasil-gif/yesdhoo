@@ -1,14 +1,17 @@
 import Link from 'next/link';
-import { Ban, Banknote, CalendarRange, CheckCircle2, ExternalLink, FileText, Plus, RefreshCw, Search, Settings, Undo2 } from 'lucide-react';
+import { Ban, Banknote, CalendarRange, CheckCircle2, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2 } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { localDate } from '@/lib/util';
 import { fmtDate, fmtMoney } from '@/lib/money';
-import { bankOf, invoiceLink, invoiceState, METHODS, STATE_LABEL } from '@/lib/billing';
+import { bankOf, competenceLabel, invoiceLink, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
-import { InvoiceItems } from '@/components/InvoiceItems';
-import { boletoInvoice, cancelInvoice, changeDueDate, generateMonth, payInvoice, reopenInvoice, saveInvoice, syncInvoice } from './actions';
+import { ChargeFields } from '@/components/ChargeForm';
+import { boletoInvoice, cancelCharge, cancelInvoice, changeDueDate, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice } from './actions';
+
+// a geracao de contrato com IA pode levar ate ~2 minutos
+export const maxDuration = 300;
 
 const BADGE: Record<string, string> = {
   aberta: 'bg-sky-100 text-sky-700', vencida: 'bg-red-100 text-red-700', paga: 'bg-emerald-100 text-emerald-700', cancelada: 'bg-ink-100 text-ink-500',
@@ -18,6 +21,8 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const user = await requireAdmin();
   const tid = user.tenantId;
+  await runRecurring(tid); // garante as faturas recorrentes do mes mesmo sem a rotina diaria
+  const tab = sp.aba === 'recorrencias' || sp.aba === 'contratos' ? sp.aba : 'faturas';
   const today = localDate();
   const month = today.slice(0, 7);
   const { page, size, skip, take } = pageParams(sp);
@@ -35,8 +40,18 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
     sum({ status: 'aberta', dueDate: { gte: today } }),
     sum({ status: 'aberta', dueDate: { lt: today } }),
     db.invoice.aggregate({ where: { tenantId: tid, status: 'paga', paidAt: { gte: new Date(`${month}-01T00:00:00-03:00`) } }, _sum: { paidCents: true }, _count: true }),
-    db.client.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
+    db.client.findMany({ where: { tenantId: tid, active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
   ]);
+  const subs = await db.subscription.findMany({
+    where: { tenantId: tid }, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+    include: { client: { select: { name: true, kind: true, active: true } }, invoices: { select: { status: true, dueDate: true } } },
+  });
+  const contracts = tab === 'contratos' ? await db.contract.findMany({ where: { tenantId: tid }, orderBy: { createdAt: 'desc' }, include: { client: { select: { name: true } } } }) : [];
+  const activeSubs = subs.filter((s) => s.status === 'ativa');
+  const tabLink = (k: string, label: string, n?: number) => (
+    <Link href={k === 'faturas' ? '/financeiro' : `/financeiro?aba=${k}`} aria-current={tab === k ? 'page' : undefined}
+      className={`border-b-2 px-3 pb-2 text-sm font-semibold ${tab === k ? 'border-brand-500 text-ink-900 dark:text-white' : 'border-transparent text-ink-400 hover:text-ink-700'}`}>{label}{n != null && <span className="ml-1 opacity-60">{n}</span>}</Link>
+  );
   const hasBank = !!bankOf(user.tenant);
   const noPix = !user.tenant.pixKey && !hasBank;
   const filters = [['', 'Todas'], ['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['cancelada', 'Canceladas']];
@@ -45,29 +60,31 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
     <>
       <PageHeader title="Financeiro" crumbs={[{ label: 'Financeiro' }, { label: 'Contas a receber' }]}>
         <Link href="/empresa#cobranca" className="btn-ghost"><Settings size={15} /> Pix e banco</Link>
-        <Modal trigger={<><CalendarRange size={16} /> Gerar mensalidades</>} triggerClass="btn-ghost" title="Gerar faturas de mensalidade">
-          <ActionForm action={generateMonth} submit="Gerar faturas">
-            <p className="text-sm text-ink-500">Cria uma fatura para cada cliente ou parceiro com mensalidade preenchida no cadastro, com vencimento no dia escolhido para cada um. Quem já tem fatura do mês é pulado.</p>
-            <Field label="Mês de referência"><input type="month" name="month" required defaultValue={month} className="input" /></Field>
-          </ActionForm>
-        </Modal>
-        <Modal trigger={<><Plus size={16} /> Nova fatura</>} title="Nova fatura" wide>
-          <ActionForm action={saveInvoice} submit="Criar fatura">
+        <Modal trigger={<><FileSignature size={16} /> Contrato com IA</>} triggerClass="btn-ghost" title="Gerar contrato com IA" wide>
+          <ActionForm action={generateContract} submit="Gerar contrato">
+            <p className="text-sm text-ink-500">A IA redige um contrato de prestação de serviços a partir do cadastro do cliente e das condições da cobrança. Leva de 30 segundos a 2 minutos. Você revisa e edita antes de usar.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Cliente ou parceiro">
                 <select name="clientId" required className="input" defaultValue="">
                   <option value="" disabled>Selecione...</option>
-                  {['cliente', 'parceiro'].map((k) => (
-                    <optgroup key={k} label={k === 'cliente' ? 'Clientes' : 'Parceiros'}>
-                      {clients.filter((c) => c.kind === k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </optgroup>
-                  ))}
+                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.kind === 'parceiro' ? 'parceiro' : 'cliente'})</option>)}
                 </select>
               </Field>
-              <Field label="Vencimento"><input type="date" name="dueDate" required className="input" defaultValue={localDate('America/Sao_Paulo', new Date(Date.now() + 7 * 86400_000))} /></Field>
+              <Field label="Condições comerciais" hint="Valor, prazo e vencimento vêm desta cobrança">
+                <select name="subscriptionId" className="input" defaultValue="">
+                  <option value="">Sem cobrança (deixar valores em branco)</option>
+                  {activeSubs.map((s) => <option key={s.id} value={s.id}>{s.client.name} — {SUB_MODE(s)} · {fmtMoney(s.amountCents)}/mês</option>)}
+                </select>
+              </Field>
             </div>
-            <InvoiceItems />
-            <Field label="Observações (aparecem na fatura)"><textarea name="notes" rows={2} className="input" /></Field>
+            <Field label="Instruções adicionais (opcional)" hint="Ex.: 3 telas, vídeos de até 15 segundos, exclusividade no segmento, multa de rescisão de 1 mensalidade">
+              <textarea name="extra" rows={3} className="input" maxLength={2000} />
+            </Field>
+          </ActionForm>
+        </Modal>
+        <Modal trigger={<><Plus size={16} /> Nova cobrança</>} title="Nova cobrança" wide>
+          <ActionForm action={saveCharge} submit="Criar cobrança">
+            <ChargeFields clients={clients} today={today} />
           </ActionForm>
         </Modal>
       </PageHeader>
@@ -80,7 +97,67 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
         <div className="card p-4"><p className="text-xs font-semibold uppercase text-emerald-600">Recebido no mês</p><p className="text-2xl font-black tabular-nums text-emerald-600">{fmtMoney(paidMonth._sum.paidCents)}</p><p className="text-xs text-ink-400">{paidMonth._count} pagamento(s)</p></div>
       </div>
 
-      <div className="card overflow-hidden">
+      <nav className="mb-4 flex gap-2 border-b border-ink-100 dark:border-ink-700" aria-label="Seções do financeiro">
+        {tabLink('faturas', 'Faturas')}{tabLink('recorrencias', 'Recorrências e períodos', activeSubs.length)}{tabLink('contratos', 'Contratos')}
+      </nav>
+
+      {tab === 'recorrencias' && (
+        <div className="card overflow-hidden">
+          {subs.length === 0 ? <Empty title="Nenhuma cobrança recorrente" text="Use “Nova cobrança” e escolha Por período ou Recorrente." /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px]">
+                <thead className="border-b border-ink-100 dark:border-ink-700"><tr><th className="th">Cliente</th><th className="th">Tipo</th><th className="th text-right">Valor mensal</th><th className="th">Vencimento</th><th className="th">Faturas</th><th className="th">Situação</th><th className="th text-right">Ações</th></tr></thead>
+                <tbody className="divide-y divide-ink-100 dark:divide-ink-700">
+                  {subs.map((s) => {
+                    const paid = s.invoices.filter((i) => i.status === 'paga').length;
+                    const late = s.invoices.filter((i) => i.status === 'aberta' && i.dueDate < today).length;
+                    return (
+                      <tr key={s.id} className={s.status === 'ativa' ? '' : 'opacity-60'}>
+                        <td className="td"><span className="block font-semibold">{s.client.name}</span><span className="text-xs text-ink-400">{s.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{!s.client.active && ' · desativado'}</span></td>
+                        <td className="td"><span className="inline-flex items-center gap-1">{s.mode === 'recorrente' && <Repeat size={13} />}{SUB_MODE(s)}</span><span className="block text-xs text-ink-400">desde {competenceLabel(s.startMonth)}</span></td>
+                        <td className="td text-right font-semibold tabular-nums">{fmtMoney(s.amountCents)}</td>
+                        <td className="td">dia {s.dueDay}</td>
+                        <td className="td tabular-nums">{s.invoices.length}{s.mode === 'periodo' && `/${s.months}`} geradas<span className="block text-xs text-ink-400">{paid} paga(s){late > 0 && <b className="text-red-600"> · {late} vencida(s)</b>}</span></td>
+                        <td className="td">{s.status === 'ativa' ? <span className="badge bg-emerald-100 text-emerald-700">Ativa</span> : <><span className="badge bg-ink-100 text-ink-500">Cancelada</span><span className="block text-xs text-ink-400">{s.cancelledAt?.toLocaleDateString('pt-BR')}{s.cancelReason ? ` · ${s.cancelReason}` : ''}</span></>}</td>
+                        <td className="td">
+                          <div className="flex justify-end gap-1.5">
+                            <Link href={`/financeiro?situacao=&cliente=${encodeURIComponent(s.client.name)}`} className="btn-icon" title="Ver faturas" aria-label="Ver faturas"><FileText size={15} /></Link>
+                            {s.status === 'ativa' && (
+                              <Modal trigger={<Ban size={15} />} triggerClass="btn-icon !text-red-600" titleAttr="Cancelar recorrência" title={`Cancelar cobrança de ${s.client.name}?`}>
+                                <ActionForm action={cancelCharge} submit="Cancelar cobrança" submitClass="btn-danger" cancel>
+                                  <input type="hidden" name="id" value={s.id} />
+                                  <p className="text-sm text-ink-500">O sistema para de gerar faturas para esta cobrança. Faturas já pagas e as vencidas continuam no financeiro.</p>
+                                  <Field label="Motivo (opcional)"><input name="reason" className="input" placeholder="Ex.: cliente desistiu" /></Field>
+                                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="cancelOpen" defaultChecked className="h-4 w-4" /> Cancelar também as faturas em aberto que ainda não venceram</label>
+                                </ActionForm>
+                              </Modal>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="border-t border-ink-100 p-3 text-xs text-ink-400 dark:border-ink-700">As cobranças recorrentes geram a fatura de cada mês automaticamente, até 15 dias antes do vencimento. Por período, todas as parcelas são geradas na criação.</p>
+        </div>
+      )}
+
+      {tab === 'contratos' && (
+        <div className="card overflow-hidden">
+          {contracts.length === 0 ? <Empty title="Nenhum contrato" text="Use “Contrato com IA” para redigir o primeiro." /> : (
+            <ul className="divide-y divide-ink-100 dark:divide-ink-700">
+              {contracts.map((c) => (
+                <li key={c.id}><Link href={`/contratos/${c.id}`} className="flex items-center justify-between gap-3 p-4 hover:bg-ink-50 dark:hover:bg-ink-700/40"><span><span className="block font-semibold">{c.title}</span><span className="text-xs text-ink-400">{c.client.name} · criado em {c.createdAt.toLocaleDateString('pt-BR')}</span></span><FileSignature size={18} className="text-ink-300" /></Link></li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {tab === 'faturas' && <div className="card overflow-hidden">
         <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">
           {filters.map(([k, label]) => (
             <Link key={k} href={k ? `/financeiro?situacao=${k}` : '/financeiro'} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${(status ?? '') === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
@@ -93,7 +170,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           <label className="text-xs text-ink-400">até<input type="date" name="ate" defaultValue={sp.ate} className="input" /></label>
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>
         </form>
-        {rows.length === 0 ? <Empty title="Nenhuma fatura" text="Crie uma fatura avulsa ou gere as mensalidades do mês." /> : (
+        {rows.length === 0 ? <Empty title="Nenhuma fatura" text="Use “Nova cobrança” para criar uma fatura avulsa, por período ou recorrente." /> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px]">
               <thead className="border-b border-ink-100 dark:border-ink-700"><tr><th className="th">Nº</th><th className="th">Cliente</th><th className="th">Vencimento</th><th className="th text-right">Valor</th><th className="th">Situação</th><th className="th text-right">Ações</th></tr></thead>
@@ -103,7 +180,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                   return (
                     <tr key={inv.id}>
                       <td className="td font-mono text-ink-500">{String(inv.number).padStart(5, '0')}</td>
-                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{inv.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{inv.competence ? ` · mensalidade ${inv.competence.split('-').reverse().join('/')}` : ''}</span></td>
+                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{inv.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}</span></td>
                       <td className="td tabular-nums">{fmtDate(inv.dueDate)}</td>
                       <td className="td text-right font-semibold tabular-nums">{fmtMoney(inv.amountCents)}</td>
                       <td className="td">
@@ -164,7 +241,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           </div>
         )}
         <Pagination page={page} size={size} total={total} params={sp} base="/financeiro" />
-      </div>
+      </div>}
     </>
   );
 }

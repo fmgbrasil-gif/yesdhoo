@@ -17,7 +17,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
   const [categories, clients, medias, groups, others] = await Promise.all([
     db.category.findMany({ orderBy: { name: 'asc' } }),
     db.client.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    db.media.findMany({ where: { OR: [{ tenantId: user.tenantId }, { tenantId: null }], active: true }, include: { client: { select: { name: true } } }, orderBy: { name: 'asc' } }),
+    db.media.findMany({ where: { OR: [{ tenantId: user.tenantId }, { tenantId: null }], active: true }, include: { client: { select: { name: true, active: true } } }, orderBy: { name: 'asc' } }),
     db.mediaGroup.findMany({ where: { tenantId: user.tenantId, active: true }, include: { medias: { include: { media: true }, orderBy: { position: 'asc' } } }, orderBy: { name: 'asc' } }),
     db.screen.findMany({ where: { ...screenScope(user), NOT: { id } }, orderBy: { name: 'asc' }, select: { id: true, name: true, items: { orderBy: { position: 'asc' }, select: { mediaId: true, groupId: true } } } }),
   ]);

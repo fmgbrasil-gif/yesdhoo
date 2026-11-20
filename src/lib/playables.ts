@@ -18,7 +18,7 @@ export type Playable = {
   count?: number;
 };
 
-type MediaWithClient = Media & { client?: { name: string } | null };
+type MediaWithClient = Media & { client?: { name: string; active?: boolean } | null };
 
 export function mediaThumb(m: Media) {
   if (m.thumb) return fileUrl(m.thumb);
@@ -45,8 +45,8 @@ const br = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
 export function mediaToPlayable(m: MediaWithClient, orientation: string): Playable {
   return {
-    key: `m:${m.id}`, id: m.id, isGroup: false, name: m.name, sub: m.client?.name ?? (m.library ? 'Biblioteca' : 'Avulso'), type: m.type, section: mediaSection(m),
-    duration: m.duration, thumb: mediaThumb(m), compatible: isCompatible(m, orientation),
+    key: `m:${m.id}`, id: m.id, isGroup: false, name: m.name, sub: m.client ? (m.client.active === false ? `${m.client.name} (desativado)` : m.client.name) : m.library ? 'Biblioteca' : 'Avulso', type: m.type, section: mediaSection(m),
+    duration: m.duration, thumb: mediaThumb(m), compatible: isCompatible(m, orientation) && m.client?.active !== false,
     period: m.startDate || m.endDate ? `${m.startDate ? br(m.startDate) : '…'} a ${m.endDate ? br(m.endDate) : '…'}` : null,
     endIso: m.endDate,
   };

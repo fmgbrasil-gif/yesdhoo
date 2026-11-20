@@ -1,12 +1,14 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { str } from '@/lib/util';
 import { parseMoney } from '@/lib/money';
 import { BankError } from '@/lib/bank/asaas';
-import { cancelBoleto, createInvoice, generateMonthly, issueBoleto, markPaid, METHODS, syncBoleto, type InvoiceItem } from '@/lib/billing';
+import { cancelBoleto, cancelSubscription, createInvoice, createSubscription, issueBoleto, markPaid, METHODS, syncBoleto, type InvoiceItem } from '@/lib/billing';
+import { ContractError, draftContract } from '@/lib/ai-contract';
 import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
 
@@ -34,29 +36,84 @@ function readItems(fd: FormData): InvoiceItem[] | string {
   return items;
 }
 
-export async function saveInvoice(_: ActionResult, fd: FormData): Promise<ActionResult> {
+/** Nova cobranca: avulsa (uma fatura), por periodo (N meses, todas as faturas de uma vez) ou recorrente (todo mes ate cancelar). */
+export async function saveCharge(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
   const client = await db.client.findFirst({ where: { id: String(fd.get('clientId')), tenantId: user.tenantId } });
   if (!client) return { error: 'Escolha o cliente.' };
-  const dueDate = str(fd, 'dueDate');
-  if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe a data de vencimento.' };
+  if (!client.active) return { error: `${client.name} está desativado. Reative o cadastro antes de cobrar.` };
   const items = readItems(fd);
   if (typeof items === 'string') return { error: items };
-  if (items.reduce((a, i) => a + i.quantity * i.unitCents, 0) <= 0) return { error: 'O total da fatura precisa ser maior que zero.' };
-  await createInvoice(user.tenantId, { clientId: client.id, items, dueDate, notes: str(fd, 'notes') ?? '' });
+  if (items.reduce((a, i) => a + i.quantity * i.unitCents, 0) <= 0) return { error: 'O total precisa ser maior que zero.' };
+  const notes = str(fd, 'notes') ?? '';
+  const mode = String(fd.get('mode'));
+  if (mode === 'avulsa') {
+    const dueDate = str(fd, 'dueDate');
+    if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe a data de vencimento.' };
+    await createInvoice(user.tenantId, { clientId: client.id, items, dueDate, notes });
+    revalidatePath('/financeiro');
+    return { ok: true };
+  }
+  if (mode !== 'periodo' && mode !== 'recorrente') return { error: 'Escolha o tipo de cobrança.' };
+  const startMonth = str(fd, 'startMonth');
+  if (!startMonth || !/^\d{4}-\d{2}$/.test(startMonth)) return { error: 'Informe o mês da primeira cobrança.' };
+  const dueDay = Number(str(fd, 'dueDay'));
+  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return { error: 'O dia de vencimento deve ficar entre 1 e 28.' };
+  const months = Number(str(fd, 'months'));
+  if (mode === 'periodo' && (!Number.isInteger(months) || months < 2 || months > 60)) return { error: 'O período deve ter entre 2 e 60 meses.' };
+  await createSubscription(user.tenantId, { clientId: client.id, mode, items, dueDay, startMonth, months: mode === 'periodo' ? months : undefined, notes });
   revalidatePath('/financeiro');
-  return { ok: true };
+  return { ok: true, message: mode === 'periodo' ? `${months} faturas geradas.` : 'Cobrança recorrente criada. As faturas serão geradas todo mês automaticamente.' };
 }
 
-export async function generateMonth(_: ActionResult, fd: FormData): Promise<ActionResult> {
+export async function cancelCharge(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
-  const ym = String(fd.get('month') ?? '');
-  if (!/^\d{4}-\d{2}$/.test(ym)) return { error: 'Escolha o mês.' };
-  const r = await generateMonthly(user.tenantId, ym);
-  revalidatePath('/financeiro');
-  if (!r.created && !r.skipped) return { error: 'Nenhum cliente com mensalidade. Preencha a mensalidade no cadastro de clientes e parceiros.' };
-  if (!r.created) return { error: 'As mensalidades deste mês já foram geradas para todos os clientes e parceiros com mensalidade.' };
-  return { ok: true, message: `${r.created} fatura(s) gerada(s).` };
+  const sub = await db.subscription.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId, status: 'ativa' } });
+  if (!sub) return { error: 'Cobrança não encontrada ou já cancelada.' };
+  const n = await cancelSubscription(sub, { reason: str(fd, 'reason'), cancelOpen: fd.get('cancelOpen') === 'on' });
+  revalidatePath('/', 'layout');
+  return { ok: true, message: n ? `Cobrança cancelada e ${n} fatura(s) futura(s) canceladas.` : 'Cobrança cancelada. Nenhuma fatura nova será gerada.' };
+}
+
+/** Gera o contrato com IA e abre a pagina dele para revisar. */
+export async function generateContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const client = await db.client.findFirst({ where: { id: String(fd.get('clientId')), tenantId: user.tenantId } });
+  if (!client) return { error: 'Escolha o cliente.' };
+  const subId = str(fd, 'subscriptionId');
+  const sub = subId ? await db.subscription.findFirst({ where: { id: subId, tenantId: user.tenantId, clientId: client.id } }) : null;
+  if (subId && !sub) return { error: 'Cobrança não encontrada para este cliente.' };
+  const screens = (await db.screen.findMany({
+    where: { tenantId: user.tenantId, OR: [{ clientId: client.id }, { items: { some: { media: { clientId: client.id } } } }] },
+    select: { name: true, city: true, state: true }, orderBy: { name: 'asc' }, take: 30,
+  })).map((s) => [s.name, s.city && `${s.city}${s.state ? '/' + s.state : ''}`].filter(Boolean).join(' — '));
+  let body: string;
+  try {
+    body = await draftContract(user.tenant, client, sub, String(fd.get('extra') ?? ''), screens);
+  } catch (e) {
+    if (e instanceof ContractError) return { error: e.message };
+    throw e;
+  }
+  const title = `Contrato — ${client.name}${sub ? ` (${sub.mode === 'periodo' ? `${sub.months} meses` : 'recorrente'})` : ''}`;
+  const contract = await db.contract.create({ data: { tenantId: user.tenantId, clientId: client.id, subscriptionId: sub?.id ?? null, title, body } });
+  redirect(`/contratos/${contract.id}`);
+}
+
+export async function saveContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const c = await db.contract.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });
+  if (!c) return { error: 'Contrato não encontrado.' };
+  const body = String(fd.get('body') ?? '').trim();
+  if (!body) return { error: 'O contrato não pode ficar vazio.' };
+  await db.contract.update({ where: { id: c.id }, data: { body: body.slice(0, 100_000), title: str(fd, 'title') ?? c.title } });
+  revalidatePath(`/contratos/${c.id}`);
+  return { ok: true, message: 'Contrato salvo.' };
+}
+
+export async function deleteContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  await db.contract.deleteMany({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });
+  redirect('/financeiro?aba=contratos');
 }
 
 export async function payInvoice(_: ActionResult, fd: FormData): Promise<ActionResult> {

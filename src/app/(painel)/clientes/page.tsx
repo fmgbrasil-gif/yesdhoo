@@ -1,14 +1,14 @@
 import type { Client } from '@prisma/client';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { fileUrl } from '@/lib/storage';
 import { STATES } from '@/lib/constants';
-import { fmtMoney, moneyInput } from '@/lib/money';
+import { fmtMoney } from '@/lib/money';
 import Link from 'next/link';
 import { Avatar, Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
-import { deleteClient, saveClient } from './actions';
+import { deleteClient, saveClient, toggleClient } from './actions';
 
 function ClientFields({ c }: { c?: Client }) {
   const f = (name: keyof Client, label: string, cls = '', extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -40,8 +40,6 @@ function ClientFields({ c }: { c?: Client }) {
         {f('zipcode', 'CEP', 'col-span-2')}
         {f('city', 'Cidade', 'col-span-4')}
         <Field label="Estado" className="col-span-2"><select name="state" defaultValue={c?.state ?? ''} className="input"><option value="">—</option>{STATES.map((uf) => <option key={uf}>{uf}</option>)}</select></Field>
-        <Field label="Mensalidade (R$)" hint="Preencha para gerar a fatura todo mês" className="col-span-3"><input name="monthlyFee" inputMode="decimal" defaultValue={moneyInput(c?.monthlyFeeCents)} className="input" placeholder="1.500,00" /></Field>
-        <Field label="Dia do vencimento" className="col-span-3"><input name="dueDay" type="number" min={1} max={28} defaultValue={c?.dueDay ?? ''} className="input" placeholder="10" /></Field>
       </div>
     </>
   );
@@ -58,7 +56,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
     <Link href={k ? `/clientes?tipo=${k}` : '/clientes'} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${kind === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label} <span className="opacity-70">{n}</span></Link>
   );
   const [rows, total] = await Promise.all([
-    db.client.findMany({ where, skip, take, orderBy: { name: 'asc' }, include: { _count: { select: { medias: true } } } }),
+    db.client.findMany({ where, skip, take, orderBy: [{ active: 'desc' }, { name: 'asc' }], include: { _count: { select: { medias: true } }, subscriptions: { where: { status: 'ativa' }, select: { amountCents: true, mode: true } } } }),
     db.client.count({ where }),
   ]);
   return (
@@ -77,18 +75,31 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
         {rows.length === 0 ? <Empty text="Cadastre os anunciantes para organizar as mídias por cliente." /> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px]">
-              <thead className="border-b border-ink-100 dark:border-ink-700"><tr><th className="th">Cliente</th><th className="th">Cidade</th><th className="th">Telefone</th><th className="th">Mídias</th><th className="th">Mensalidade</th><th className="th text-right">Ações</th></tr></thead>
+              <thead className="border-b border-ink-100 dark:border-ink-700"><tr><th className="th">Cliente</th><th className="th">Cidade</th><th className="th">Telefone</th><th className="th">Mídias</th><th className="th">Cobrança mensal</th><th className="th text-right">Ações</th></tr></thead>
               <tbody className="divide-y divide-ink-100 dark:divide-ink-700">
                 {rows.map((c) => (
-                  <tr key={c.id}>
-                    <td className="td"><span className="flex items-center gap-3"><Avatar src={fileUrl(c.image)} name={c.name} /><span><span className="block font-semibold">{c.name}</span><span className="text-xs text-ink-400"><span className={`badge mr-1 ${c.kind === 'parceiro' ? 'bg-sky-100 text-sky-700' : 'bg-brand-100 text-brand-700'}`}>{c.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}</span>{c.email ?? ''}</span></span></span></td>
+                  <tr key={c.id} className={c.active ? '' : 'opacity-60'}>
+                    <td className="td"><span className="flex items-center gap-3"><Avatar src={fileUrl(c.image)} name={c.name} /><span><span className="block font-semibold">{c.name}</span><span className="text-xs text-ink-400"><span className={`badge mr-1 ${c.kind === 'parceiro' ? 'bg-sky-100 text-sky-700' : 'bg-brand-100 text-brand-700'}`}>{c.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}</span>{!c.active && <span className="badge mr-1 bg-red-100 text-red-700">Desativado</span>}{c.email ?? ''}</span></span></span></td>
                     <td className="td text-ink-500">{c.city ? `${c.city}${c.state ? '/' + c.state : ''}` : '—'}</td>
                     <td className="td text-ink-500">{c.phone1 ?? '—'}</td>
                     <td className="td font-semibold">{c._count.medias}</td>
-                    <td className="td text-ink-500">{c.monthlyFeeCents ? <>{fmtMoney(c.monthlyFeeCents)}<span className="block text-xs">dia {c.dueDay}</span></> : '—'}</td>
+                    <td className="td text-ink-500 tabular-nums">{c.subscriptions.length ? <>{fmtMoney(c.subscriptions.reduce((a, s) => a + s.amountCents, 0))}<span className="block text-xs">{c.subscriptions.length} cobrança(s) ativa(s)</span></> : '—'}</td>
                     <td className="td">
                       <div className="flex justify-end gap-1.5">
                         <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar" title="Editar cliente"><ActionForm action={saveClient}><ClientFields c={c} /></ActionForm></Modal>
+                        {c.active ? (
+                          <Modal trigger={<Power size={15} />} triggerClass="btn-icon !text-red-600" titleAttr="Desativar" title={`Desativar ${c.name}?`}>
+                            <ActionForm action={toggleClient} submit="Desativar" submitClass="btn-danger" cancel>
+                              <input type="hidden" name="id" value={c.id} />
+                              <p className="text-sm text-ink-500">Os vídeos e imagens de {c.name} param de rodar em todas as telas em até 1 minuto. Nada é apagado: ao reativar, eles voltam às playlists onde estavam.</p>
+                              {c.subscriptions.length > 0 && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="cancelCharges" defaultChecked className="h-4 w-4" /> Cancelar também as {c.subscriptions.length} cobrança(s) recorrente(s) e as faturas futuras</label>}
+                            </ActionForm>
+                          </Modal>
+                        ) : (
+                          <Modal trigger={<Power size={15} />} triggerClass="btn-icon !text-emerald-600" titleAttr="Reativar" title={`Reativar ${c.name}?`}>
+                            <ActionForm action={toggleClient} submit="Reativar" cancel><input type="hidden" name="id" value={c.id} /><p className="text-sm text-ink-500">Os conteúdos voltam a rodar nas telas onde estavam. Cobranças canceladas não voltam sozinhas.</p></ActionForm>
+                          </Modal>
+                        )}
                         <Confirm trigger={<Trash2 size={15} />} titleAttr="Remover" title="Excluir este cliente?" text={`“${c.name}” será excluído. As mídias dele continuam cadastradas como avulsas.`} confirmLabel="Sim, quero excluir" action={deleteClient} fields={{ id: c.id }} />
                       </div>
                     </td>

@@ -45,8 +45,12 @@ export default async function PlataformaPage() {
     where: { isPlatform: false }, orderBy: { name: 'asc' },
     include: { _count: { select: { screens: true } }, users: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, email: true, role: true, lastLoginAt: true, mustChangePassword: true } } },
   });
-  const billing = await db.client.findMany({ where: { id: { in: tenants.map((t) => t.billingClientId).filter((x): x is string => !!x) } }, include: { invoices: { where: { status: 'aberta' }, select: { amountCents: true, dueDate: true } } } });
-  const bill = Object.fromEntries(billing.map((c) => [c.id, c]));
+  const billing = await db.client.findMany({
+    where: { id: { in: tenants.map((t) => t.billingClientId).filter((x): x is string => !!x) } },
+    include: { invoices: { where: { status: 'aberta' }, select: { amountCents: true, dueDate: true } }, subscriptions: { where: { status: 'ativa', mode: 'recorrente' }, take: 1 } },
+  });
+  // mensalidade = cobranca recorrente ativa da empresa
+  const bill = Object.fromEntries(billing.map((c) => [c.id, { ...c, monthlyFeeCents: c.subscriptions[0]?.amountCents ?? null, dueDay: c.subscriptions[0]?.dueDay ?? null }]));
   const active = tenants.filter((t) => t.status === 'ativo').length;
   const mrr = tenants.reduce((a, t) => a + (t.billingClientId && t.status === 'ativo' ? bill[t.billingClientId]?.monthlyFeeCents ?? 0 : 0), 0);
 
@@ -136,7 +140,7 @@ export default async function PlataformaPage() {
           </div>
         )}
       </div>
-      <p className="mt-4 max-w-3xl text-sm text-ink-500">As mensalidades das empresas são faturadas pelo seu <Link href="/financeiro" className="font-semibold underline">Financeiro</Link> (botão “Gerar mensalidades”). Quando uma fatura passa do vencimento além da tolerância escolhida, a empresa é bloqueada sozinha e vê a fatura com o Pix na tela de bloqueio; ao registrar o pagamento, ela é liberada automaticamente.</p>
+      <p className="mt-4 max-w-3xl text-sm text-ink-500">As mensalidades das empresas são faturadas pelo seu <Link href="/financeiro" className="font-semibold underline">Financeiro</Link> (geradas automaticamente todo mês). Quando uma fatura passa do vencimento além da tolerância escolhida, a empresa é bloqueada sozinha e vê a fatura com o Pix na tela de bloqueio; ao registrar o pagamento, ela é liberada automaticamente.</p>
     </>
   );
 }

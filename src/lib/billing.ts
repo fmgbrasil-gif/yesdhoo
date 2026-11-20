@@ -1,4 +1,4 @@
-import type { Client, Invoice, Tenant } from '@prisma/client';
+import type { Client, Invoice, Subscription, Tenant } from '@prisma/client';
 import { db } from './db';
 import { decrypt, randomToken } from './crypto';
 import { pixPayload } from './pix';
@@ -20,14 +20,14 @@ export const STATE_LABEL: Record<string, string> = { aberta: 'Em aberto', vencid
 export const METHODS: Record<string, string> = { pix: 'Pix', boleto: 'Boleto', transferencia: 'Transferência', dinheiro: 'Dinheiro', cartao: 'Cartão' };
 
 /** Cria a fatura com o proximo numero sequencial da empresa. */
-export async function createInvoice(tenantId: string, data: { clientId: string; items: InvoiceItem[]; dueDate: string; competence?: string | null; notes?: string }) {
+export async function createInvoice(tenantId: string, data: { clientId: string; items: InvoiceItem[]; dueDate: string; competence?: string | null; notes?: string; subscriptionId?: string; installment?: number }) {
   const amountCents = itemsTotal(data.items);
   return db.$transaction(async (tx) => {
     const t = await tx.tenant.update({ where: { id: tenantId }, data: { invoiceSeq: { increment: 1 } }, select: { invoiceSeq: true } });
     return tx.invoice.create({
       data: {
         tenantId, clientId: data.clientId, number: t.invoiceSeq, items: JSON.stringify(data.items), amountCents, dueDate: data.dueDate,
-        competence: data.competence ?? null, notes: data.notes ?? '', publicToken: randomToken(18), txid: `FAT${String(t.invoiceSeq).padStart(6, '0')}${randomToken(6).replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 25),
+        competence: data.competence ?? null, notes: data.notes ?? '', subscriptionId: data.subscriptionId ?? null, installment: data.installment ?? null, publicToken: randomToken(18), txid: `FAT${String(t.invoiceSeq).padStart(6, '0')}${randomToken(6).replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 25),
       },
     });
   });
@@ -36,20 +36,106 @@ export async function createInvoice(tenantId: string, data: { clientId: string; 
 const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 export const competenceLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]}/${ym.slice(0, 4)}`;
 
-/** Gera as faturas de mensalidade de um mes (YYYY-MM) para quem tem mensalidade e ainda nao foi faturado. */
-export async function generateMonthly(tenantId: string, ym: string) {
-  const clients = await db.client.findMany({ where: { tenantId, monthlyFeeCents: { gt: 0 } }, orderBy: { name: 'asc' } });
-  const existing = new Set((await db.invoice.findMany({ where: { tenantId, competence: ym }, select: { clientId: true } })).map((i) => i.clientId));
-  let created = 0;
-  for (const c of clients) {
-    if (existing.has(c.id)) continue;
-    const day = String(Math.min(28, Math.max(1, c.dueDay ?? 10))).padStart(2, '0');
-    const kindLabel = c.kind === 'parceiro' ? 'Mensalidade' : 'Veiculação de mídia indoor';
-    await createInvoice(tenantId, { clientId: c.id, competence: ym, dueDate: `${ym}-${day}`, items: [{ description: `${kindLabel} — ${competenceLabel(ym)}`, quantity: 1, unitCents: c.monthlyFeeCents! }] });
-    created++;
-  }
-  return { created, skipped: clients.length - created };
+// ---------- cobrancas por periodo e recorrentes ----------
+export const addMonths = (ym: string, n: number) => {
+  const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+export const dueFor = (ym: string, dueDay: number) => `${ym}-${String(Math.min(28, Math.max(1, dueDay))).padStart(2, '0')}`;
+
+/** Recorrente: gera ate o mes atual e adianta o mes seguinte quando o vencimento dele estiver a ate 15 dias. */
+const LEAD_DAYS = 15;
+
+/** Meses que ja deveriam ter fatura para esta cobranca. */
+export function monthsDue(sub: Pick<Subscription, 'mode' | 'startMonth' | 'months' | 'dueDay'>, today = localDate()) {
+  if (sub.mode === 'periodo') return Array.from({ length: sub.months ?? 1 }, (_, i) => addMonths(sub.startMonth, i));
+  const current = today.slice(0, 7);
+  const out: string[] = [];
+  for (let m = sub.startMonth; m <= current; m = addMonths(m, 1)) out.push(m);
+  const next = addMonths(current, 1);
+  if (next >= sub.startMonth && !out.includes(next) && (Date.parse(dueFor(next, sub.dueDay)) - Date.parse(today)) / 86400_000 <= LEAD_DAYS) out.push(next);
+  return out;
 }
+
+/** Cria as faturas que faltam para uma cobranca (idempotente: um mes nunca e faturado duas vezes). */
+export async function generateForSubscription(sub: Subscription, today = localDate()) {
+  if (sub.status !== 'ativa') return 0;
+  const done = new Set((await db.invoice.findMany({ where: { subscriptionId: sub.id }, select: { competence: true } })).map((i) => i.competence));
+  const items = parseJson<InvoiceItem[]>(sub.items, []);
+  const months = monthsDue(sub, today);
+  let created = 0;
+  for (const [i, ym] of months.entries()) {
+    if (done.has(ym)) continue;
+    const tag = sub.mode === 'periodo' ? ` — parcela ${i + 1}/${months.length} (${competenceLabel(ym)})` : ` — ${competenceLabel(ym)}`;
+    try {
+      await createInvoice(sub.tenantId, {
+        clientId: sub.clientId, subscriptionId: sub.id, competence: ym, installment: sub.mode === 'periodo' ? i + 1 : undefined,
+        dueDate: dueFor(ym, sub.dueDay), notes: sub.notes, items: items.map((it) => ({ ...it, description: it.description + tag })),
+      });
+      created++;
+    } catch (e) {
+      // outra execucao simultanea ja criou esta fatura (indice unico de cobranca + mes)
+      if ((e as { code?: string }).code !== 'P2002') throw e;
+    }
+  }
+  return created;
+}
+
+/** Roda todas as cobrancas ativas (de uma empresa ou de todas). Chamado pela rotina diaria e ao abrir o Financeiro. */
+export async function runRecurring(tenantId?: string) {
+  const subs = await db.subscription.findMany({ where: { status: 'ativa', ...(tenantId ? { tenantId } : {}) } });
+  let created = 0;
+  for (const s of subs) created += await generateForSubscription(s);
+  return { subscriptions: subs.length, created };
+}
+
+export async function createSubscription(tenantId: string, data: { clientId: string; mode: 'periodo' | 'recorrente'; items: InvoiceItem[]; dueDay: number; startMonth: string; months?: number; notes?: string }) {
+  const sub = await db.subscription.create({
+    data: {
+      tenantId, clientId: data.clientId, mode: data.mode, items: JSON.stringify(data.items), amountCents: itemsTotal(data.items), dueDay: data.dueDay,
+      startMonth: data.startMonth, months: data.mode === 'periodo' ? data.months : null, notes: data.notes ?? '',
+    },
+  });
+  await generateForSubscription(sub);
+  return sub;
+}
+
+/** Cancela a cobranca: nao gera mais faturas. Opcionalmente cancela as faturas em aberto que ainda nao venceram. */
+export async function cancelSubscription(sub: Subscription, opts: { reason?: string | null; cancelOpen: boolean }) {
+  await db.subscription.update({ where: { id: sub.id }, data: { status: 'cancelada', cancelledAt: new Date(), cancelReason: opts.reason ?? null } });
+  if (!opts.cancelOpen) return 0;
+  const tenant = await db.tenant.findUniqueOrThrow({ where: { id: sub.tenantId } });
+  const open = await db.invoice.findMany({ where: { subscriptionId: sub.id, status: 'aberta', dueDate: { gte: localDate() } } });
+  for (const inv of open) {
+    await cancelBoleto(inv, tenant).catch(() => {}); // se o banco falhar, a fatura e cancelada aqui mesmo assim
+    await db.invoice.update({ where: { id: inv.id }, data: { status: 'cancelada' } });
+  }
+  await afterPlatformInvoiceChange(sub.clientId);
+  return open.length;
+}
+
+/** Converte a "mensalidade" antiga do cadastro do cliente em cobranca recorrente (executado uma vez). */
+export async function migrateLegacyFees() {
+  const clients = await db.client.findMany({ where: { monthlyFeeCents: { gt: 0 } } });
+  for (const c of clients) {
+    const has = await db.subscription.count({ where: { clientId: c.id, status: 'ativa' } });
+    if (!has) {
+      const month = localDate().slice(0, 7);
+      const already = await db.invoice.count({ where: { clientId: c.id, competence: month } });
+      await db.subscription.create({
+        data: {
+          tenantId: c.tenantId, clientId: c.id, mode: 'recorrente', amountCents: c.monthlyFeeCents!, dueDay: c.dueDay ?? 10,
+          startMonth: already ? addMonths(month, 1) : month,
+          items: JSON.stringify([{ description: c.kind === 'parceiro' ? 'Mensalidade' : 'Veiculação de mídia indoor', quantity: 1, unitCents: c.monthlyFeeCents! }]),
+        },
+      });
+    }
+    await db.client.update({ where: { id: c.id }, data: { monthlyFeeCents: null, dueDay: null } });
+  }
+  return clients.length;
+}
+
+export const SUB_MODE = (s: Pick<Subscription, 'mode' | 'months'>) => (s.mode === 'periodo' ? `${s.months} ${s.months === 1 ? 'mês' : 'meses'}` : 'Recorrente');
 
 /** Pix Copia e Cola da fatura: o do banco (baixa automatica) ou, sem banco, o gerado pela chave Pix da empresa. */
 export function invoicePix(inv: Invoice, tenant: Tenant) {
