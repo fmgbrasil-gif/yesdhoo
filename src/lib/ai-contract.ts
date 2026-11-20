@@ -69,9 +69,57 @@ function describe(t: Tenant, c: Client, sub: Subscription | null, extra: string,
 
 export type Attachment = { name: string; mime: string; data: string };
 
-/** Redige o contrato com Claude. Pode levar de 30 segundos a 2 minutos. */
+/** Ha alguma IA configurada no servidor? (OpenAI/ChatGPT tem prioridade; Claude como alternativa) */
+export const aiConfigured = () => !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+
+/** Redige o contrato com o ChatGPT (API Responses da OpenAI). */
+async function draftWithOpenAI(prompt: string, attachments: Attachment[]) {
+  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+  let res: Response;
+  try {
+    res = await fetch(`${base}/responses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      signal: AbortSignal.timeout(240_000),
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || 'gpt-5',
+        instructions: SYSTEM,
+        max_output_tokens: 32000,
+        reasoning: { effort: 'low' },
+        input: [{
+          role: 'user',
+          content: [
+            ...attachments.map((a) => (a.mime === 'application/pdf'
+              ? { type: 'input_file', filename: a.name, file_data: `data:application/pdf;base64,${a.data}` }
+              : { type: 'input_image', image_url: `data:${a.mime};base64,${a.data}` })),
+            { type: 'input_text', text: prompt },
+          ],
+        }],
+      }),
+    });
+  } catch (e) {
+    if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) throw new ContractError('A geração demorou demais. Tente de novo.');
+    throw new ContractError('Não foi possível falar com o ChatGPT agora. Tente de novo em instantes.');
+  }
+  const data = await res.json().catch(() => null) as null | {
+    status?: string; incomplete_details?: { reason?: string }; error?: { message?: string };
+    output?: { type: string; content?: { type: string; text?: string; refusal?: string }[] }[];
+  };
+  if (res.status === 401) throw new ContractError('A chave da API do ChatGPT (OPENAI_API_KEY) configurada no servidor é inválida.');
+  if (res.status === 429) throw new ContractError('Limite do ChatGPT atingido (muitas gerações seguidas ou sem créditos na conta OpenAI). Aguarde ou verifique os créditos em platform.openai.com.');
+  if (!res.ok || !data) throw new ContractError(`O ChatGPT está indisponível agora (erro ${res.status}). Tente de novo em instantes.`);
+  const parts = (data.output ?? []).filter((o) => o.type === 'message').flatMap((o) => o.content ?? []);
+  const text = parts.map((c) => (c.type === 'output_text' ? c.text ?? '' : '')).join('').trim();
+  if (!text && parts.some((c) => c.type === 'refusal')) throw new ContractError('A IA não conseguiu redigir este contrato. Revise as instruções adicionais e tente de novo.');
+  if (!text) throw new ContractError('A IA devolveu um contrato vazio. Tente de novo.');
+  if (data.status === 'incomplete' && data.incomplete_details?.reason === 'max_output_tokens') return text + '\n\n[ATENÇÃO: o texto foi interrompido por tamanho. Gere novamente ou complete manualmente.]';
+  return text;
+}
+
+/** Redige o contrato com IA (ChatGPT se OPENAI_API_KEY existir, senao Claude). Pode levar de 30 segundos a 2 minutos. */
 export async function draftContract(t: Tenant, c: Client, sub: Subscription | null, extra: string, screens: string[], attachments: Attachment[] = []) {
-  if (!process.env.ANTHROPIC_API_KEY) throw new ContractError('A geração de contratos com IA ainda não foi configurada no servidor (falta a chave ANTHROPIC_API_KEY).');
+  if (process.env.OPENAI_API_KEY) return draftWithOpenAI(`Dados para o contrato:\n\n${describe(t, c, sub, extra, screens, attachments.length)}`, attachments);
+  if (!process.env.ANTHROPIC_API_KEY) throw new ContractError('A geração de contratos com IA ainda não foi configurada no servidor (falta a chave OPENAI_API_KEY).');
   const client = new Anthropic({ timeout: 240_000, maxRetries: 1 });
   try {
     // streaming evita estouro de tempo em respostas longas; finalMessage() junta o resultado
