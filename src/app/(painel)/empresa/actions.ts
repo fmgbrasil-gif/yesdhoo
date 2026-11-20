@@ -27,7 +27,15 @@ export async function saveCompany(_: ActionResult, fd: FormData): Promise<Action
     logo = await saveFile(file, 'logos');
   }
   if (fd.get('removeLogo') === 'on') { await removeFile(logo); logo = null; }
-  await db.tenant.update({ where: { id: user.tenantId }, data: { name, color, logo, document: str(fd, 'document')?.replace(/\D/g, '') ?? null } });
+  const field = (k: string) => str(fd, k);
+  await db.tenant.update({
+    where: { id: user.tenantId },
+    data: {
+      name, color, logo, document: field('document')?.replace(/\D/g, '') ?? null, tradeName: field('tradeName'), stateRegistration: field('stateRegistration'),
+      email: field('email'), phone: field('phone'), road: field('road'), number: field('number'), complement: field('complement'),
+      neighborhood: field('neighborhood'), zipcode: field('zipcode'), city: field('city'), state: field('state'),
+    },
+  });
   revalidatePath('/', 'layout');
   return { ok: true, message: 'Dados da empresa salvos.' };
 }
@@ -38,7 +46,11 @@ export async function savePix(_: ActionResult, fd: FormData): Promise<ActionResu
   if (key) { const p = pixKeyProblem(key); if (p) return { error: p }; }
   await db.tenant.update({
     where: { id: user.tenantId },
-    data: { pixKey: key, pixName: str(fd, 'pixName'), pixCity: str(fd, 'pixCity'), invoiceNotes: String(fd.get('invoiceNotes') ?? '').slice(0, 1000) },
+    data: {
+      pixKey: key, pixName: str(fd, 'pixName'), pixCity: str(fd, 'pixCity'), invoiceNotes: String(fd.get('invoiceNotes') ?? '').slice(0, 1000),
+      invoiceTitle: (str(fd, 'invoiceTitle') ?? 'FATURA DE SERVIÇOS').toUpperCase().slice(0, 40), invoiceNature: (str(fd, 'invoiceNature') ?? '').toUpperCase().slice(0, 80),
+      invoiceFiscal: String(fd.get('invoiceFiscal') ?? '').slice(0, 600),
+    },
   });
   revalidatePath('/empresa');
   return { ok: true, message: 'Dados de cobrança salvos.' };

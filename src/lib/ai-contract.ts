@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Client, Subscription, Tenant } from '@prisma/client';
 import { fmtMoney } from './money';
 import { competenceLabel, addMonths, invoiceItems } from './billing';
+import { addressLine, fmtCep, fmtDoc } from './docs';
 
 export class ContractError extends Error {}
 
@@ -15,21 +16,31 @@ Regras:
 - Valores sempre em reais por extenso e em algarismos, exatamente como informados.
 - Se o contratante for PARCEIRO (local onde a tela fica instalada), o objeto é a cessão de espaço e a instalação/operação da tela no estabelecimento, com a contraprestação informada; se for CLIENTE (anunciante), o objeto é a veiculação dos anúncios dele nas telas da rede.
 - Inclua, nesta ordem, cláusulas numeradas por extenso (CLÁUSULA PRIMEIRA, SEGUNDA...): partes; objeto; especificações da veiculação (conteúdos, duração, formato, aprovação do material, responsabilidade pelo conteúdo); prazo e vigência (período definido ou prazo indeterminado com renovação mensal automática, conforme os dados); preço e forma de pagamento (Pix e/ou boleto, vencimento, multa de 2% e juros de 1% ao mês por atraso, suspensão da veiculação após inadimplência); obrigações da contratada; obrigações do contratante; comprovação de exibição (relatório de exibições); rescisão (aviso prévio de 30 dias, sem multa salvo disposição em contrário); proteção de dados (LGPD); disposições gerais; foro.
+- Se houver anexos (modelo de contrato, proposta comercial, tabela de preços, fotos ou documentos), use-os como referência de cláusulas, condições e dados; quando o anexo e os dados cadastrais divergirem, prevalecem os dados cadastrais e as condições comerciais fornecidos em texto.
 - Termine com local e data em branco e blocos de assinatura das duas partes e de duas testemunhas.
 - Formato: texto simples. Título em maiúsculas na primeira linha. Cada cláusula começa numa linha própria com "CLÁUSULA ... –" seguida do tema em maiúsculas; parágrafos e incisos numerados abaixo. Não use Markdown (sem #, *, tabelas). Não escreva nada antes do título nem depois das assinaturas.`;
 
-function describe(t: Tenant, c: Client, sub: Subscription | null, extra: string, screens: string[]) {
-  const addr = [c.road, c.number, c.complement, c.neighborhood, c.city && `${c.city}${c.state ? '/' + c.state : ''}`, c.zipcode && `CEP ${c.zipcode}`].filter(Boolean).join(', ');
+const full = (x: { road?: string | null; number?: string | null; complement?: string | null; neighborhood?: string | null; city?: string | null; state?: string | null; zipcode?: string | null }) =>
+  [addressLine(x), x.city && `${x.city}${x.state ? '/' + x.state : ''}`, x.zipcode && `CEP ${fmtCep(x.zipcode)}`].filter(Boolean).join(', ');
+
+function describe(t: Tenant, c: Client, sub: Subscription | null, extra: string, screens: string[], attachments: number) {
   const lines = [
     'CONTRATADA (empresa de mídia):',
-    `- Razão social/nome: ${t.name}`,
-    `- CNPJ: ${t.document || 'não informado'}`,
+    `- Razão social: ${t.name}`,
+    `- Nome fantasia: ${t.tradeName || 'não informado'}`,
+    `- CNPJ: ${fmtDoc(t.document) || 'não informado'}`,
+    `- Inscrição estadual: ${t.stateRegistration || 'não informada'}`,
+    `- Endereço: ${full(t) || 'não informado'}`,
+    `- E-mail: ${t.email || 'não informado'}`,
+    `- Telefone: ${t.phone || 'não informado'}`,
     '',
     `CONTRATANTE (${c.kind === 'parceiro' ? 'PARCEIRO — local onde a tela fica instalada' : 'CLIENTE — anunciante'}):`,
-    `- Nome: ${c.name}`,
+    `- ${c.type === 'PF' ? 'Nome' : 'Razão social'}: ${c.name}`,
+    ...(c.tradeName ? [`- Nome fantasia: ${c.tradeName}`] : []),
     `- Tipo: ${c.type === 'PF' ? 'pessoa física' : 'pessoa jurídica'}`,
-    `- ${c.type === 'PF' ? 'CPF' : 'CNPJ'}: ${c.document || 'não informado'}`,
-    `- Endereço: ${addr || 'não informado'}`,
+    `- ${c.type === 'PF' ? 'CPF' : 'CNPJ'}: ${fmtDoc(c.document) || 'não informado'}`,
+    ...(c.stateRegistration ? [`- Inscrição estadual: ${c.stateRegistration}`] : []),
+    `- Endereço: ${full(c) || 'não informado'}`,
     `- E-mail: ${c.email || 'não informado'}`,
     `- Telefone: ${c.phone1 || 'não informado'}`,
     '',
@@ -39,7 +50,7 @@ function describe(t: Tenant, c: Client, sub: Subscription | null, extra: string,
     const end = sub.mode === 'periodo' ? addMonths(sub.startMonth, (sub.months ?? 1) - 1) : null;
     lines.push(
       'CONDIÇÕES COMERCIAIS:',
-      ...items.map((i) => `- ${i.description}: ${String(i.quantity).replace('.', ',')} × ${fmtMoney(i.unitCents)}`),
+      ...items.map((i) => `- ${i.description}: ${String(i.quantity).replace('.', ',')} ${i.unit ?? 'un'} × ${fmtMoney(i.unitCents)}`),
       `- Valor mensal total: ${fmtMoney(sub.amountCents)}`,
       `- Vencimento: todo dia ${sub.dueDay} de cada mês`,
       sub.mode === 'periodo'
@@ -47,16 +58,19 @@ function describe(t: Tenant, c: Client, sub: Subscription | null, extra: string,
         : `- Prazo: indeterminado, com cobrança mensal recorrente a partir de ${competenceLabel(sub.startMonth)}`,
     );
   } else {
-    lines.push('CONDIÇÕES COMERCIAIS: não definidas no sistema — use [PREENCHER] para valor, vencimento e prazo.');
+    lines.push('CONDIÇÕES COMERCIAIS: não definidas no sistema — use os anexos, se houver, ou [PREENCHER] para valor, vencimento e prazo.');
   }
   lines.push('- Formas de pagamento aceitas: Pix (QR Code na fatura) e boleto bancário.');
   if (screens.length) lines.push('', 'TELAS / LOCAIS DE EXIBIÇÃO ATUAIS DO CONTRATANTE:', ...screens.map((s) => `- ${s}`));
+  if (attachments) lines.push('', `ANEXOS: ${attachments} arquivo(s) enviado(s) acima nesta mensagem, para usar como referência.`);
   if (extra.trim()) lines.push('', 'INSTRUÇÕES ADICIONAIS DO USUÁRIO (respeite, desde que não contrariem a lei):', extra.trim().slice(0, 2000));
   return lines.join('\n');
 }
 
+export type Attachment = { name: string; mime: string; data: string };
+
 /** Redige o contrato com Claude. Pode levar de 30 segundos a 2 minutos. */
-export async function draftContract(t: Tenant, c: Client, sub: Subscription | null, extra: string, screens: string[]) {
+export async function draftContract(t: Tenant, c: Client, sub: Subscription | null, extra: string, screens: string[], attachments: Attachment[] = []) {
   if (!process.env.ANTHROPIC_API_KEY) throw new ContractError('A geração de contratos com IA ainda não foi configurada no servidor (falta a chave ANTHROPIC_API_KEY).');
   const client = new Anthropic({ timeout: 240_000, maxRetries: 1 });
   try {
@@ -69,7 +83,16 @@ export async function draftContract(t: Tenant, c: Client, sub: Subscription | nu
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: `Dados para o contrato:\n\n${describe(t, c, sub, extra, screens)}` }],
+      messages: [{
+        role: 'user',
+        content: [
+          // anexos antes do texto: PDF como documento, imagens como imagem
+          ...attachments.map((a) => (a.mime === 'application/pdf'
+            ? { type: 'document' as const, source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: a.data }, title: a.name }
+            : { type: 'image' as const, source: { type: 'base64' as const, media_type: a.mime as 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif', data: a.data } })),
+          { type: 'text' as const, text: `Dados para o contrato:\n\n${describe(t, c, sub, extra, screens, attachments.length)}` },
+        ],
+      }],
     });
     const msg = await stream.finalMessage();
     if (msg.stop_reason === 'refusal') throw new ContractError('A IA não conseguiu redigir este contrato. Revise as instruções adicionais e tente de novo.');

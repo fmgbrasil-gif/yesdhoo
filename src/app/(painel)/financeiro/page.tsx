@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { Ban, Banknote, CalendarRange, CheckCircle2, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2 } from 'lucide-react';
+import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2 } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { localDate } from '@/lib/util';
 import { fmtDate, fmtMoney } from '@/lib/money';
-import { bankOf, competenceLabel, invoiceLink, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
+import { bankOf, competenceLabel, invoiceItems, invoiceLink, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { ChargeFields } from '@/components/ChargeForm';
-import { boletoInvoice, cancelCharge, cancelInvoice, changeDueDate, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice } from './actions';
+import { boletoInvoice, cancelCharge, cancelInvoice, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice, updateCharge, updateInvoice } from './actions';
+import { InvoiceItems } from '@/components/InvoiceItems';
+import { MoneyInput } from '@/components/MoneyInput';
 
 // a geracao de contrato com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
@@ -46,6 +48,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
     where: { tenantId: tid }, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     include: { client: { select: { name: true, kind: true, active: true } }, invoices: { select: { status: true, dueDate: true } } },
   });
+  const services = (await db.service.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' } })).map((x) => ({ id: x.id, name: x.name, unit: x.unit, priceCents: x.priceCents }));
   const contracts = tab === 'contratos' ? await db.contract.findMany({ where: { tenantId: tid }, orderBy: { createdAt: 'desc' }, include: { client: { select: { name: true } } } }) : [];
   const activeSubs = subs.filter((s) => s.status === 'ativa');
   const tabLink = (k: string, label: string, n?: number) => (
@@ -62,7 +65,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
         <Link href="/empresa#cobranca" className="btn-ghost"><Settings size={15} /> Pix e banco</Link>
         <Modal trigger={<><FileSignature size={16} /> Contrato com IA</>} triggerClass="btn-ghost" title="Gerar contrato com IA" wide>
           <ActionForm action={generateContract} submit="Gerar contrato">
-            <p className="text-sm text-ink-500">A IA redige um contrato de prestação de serviços a partir do cadastro do cliente e das condições da cobrança. Leva de 30 segundos a 2 minutos. Você revisa e edita antes de usar.</p>
+            <p className="text-sm text-ink-500">A IA redige um contrato de prestação de serviços com os dados da sua empresa e do cliente, as condições da cobrança e os anexos que você enviar. Leva de 30 segundos a 2 minutos. Você revisa e edita antes de usar.</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Cliente ou parceiro">
                 <select name="clientId" required className="input" defaultValue="">
@@ -80,11 +83,15 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             <Field label="Instruções adicionais (opcional)" hint="Ex.: 3 telas, vídeos de até 15 segundos, exclusividade no segmento, multa de rescisão de 1 mensalidade">
               <textarea name="extra" rows={3} className="input" maxLength={2000} />
             </Field>
+            <Field label="Anexos (opcional)" hint="PDF ou imagens, como um modelo de contrato, proposta ou tabela de preços. Até 5 arquivos e 4 MB no total.">
+              <input type="file" name="attachments" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" className="input" />
+            </Field>
+            <p className="text-xs text-ink-400">Os dados da sua empresa (Minha empresa) e do cliente (Clientes e parceiros) entram no contrato automaticamente.</p>
           </ActionForm>
         </Modal>
         <Modal trigger={<><Plus size={16} /> Nova cobrança</>} title="Nova cobrança" wide>
           <ActionForm action={saveCharge} submit="Criar cobrança">
-            <ChargeFields clients={clients} today={today} />
+            <ChargeFields clients={clients} today={today} services={services} />
           </ActionForm>
         </Modal>
       </PageHeader>
@@ -122,6 +129,18 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                         <td className="td">
                           <div className="flex justify-end gap-1.5">
                             <Link href={`/financeiro?situacao=&cliente=${encodeURIComponent(s.client.name)}`} className="btn-icon" title="Ver faturas" aria-label="Ver faturas"><FileText size={15} /></Link>
+                            {s.status === 'ativa' && (
+                              <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar cobrança" title={`Editar cobrança de ${s.client.name}`} wide>
+                                <ActionForm action={updateCharge}>
+                                  <input type="hidden" name="id" value={s.id} />
+                                  <p className="text-sm text-ink-500">{SUB_MODE(s)} desde {competenceLabel(s.startMonth)}. As mudanças valem para as próximas faturas.</p>
+                                  <Field label="Dia do vencimento"><input type="number" name="dueDay" min={1} max={28} required defaultValue={s.dueDay} className="input w-32" /></Field>
+                                  <InvoiceItems initial={invoiceItems(s)} services={services} />
+                                  <Field label="Observações"><textarea name="notes" rows={2} defaultValue={s.notes} className="input" /></Field>
+                                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="applyOpen" defaultChecked className="h-4 w-4" /> Aplicar também às faturas em aberto que ainda não venceram</label>
+                                </ActionForm>
+                              </Modal>
+                            )}
                             {s.status === 'ativa' && (
                               <Modal trigger={<Ban size={15} />} triggerClass="btn-icon !text-red-600" titleAttr="Cancelar recorrência" title={`Cancelar cobrança de ${s.client.name}?`}>
                                 <ActionForm action={cancelCharge} submit="Cancelar cobrança" submitClass="btn-danger" cancel>
@@ -197,7 +216,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                                 <ActionForm action={payInvoice} submit="Confirmar pagamento">
                                   <input type="hidden" name="id" value={inv.id} />
                                   <div className="grid gap-3 sm:grid-cols-3">
-                                    <Field label="Valor recebido"><input name="paid" inputMode="decimal" defaultValue={(inv.amountCents / 100).toFixed(2).replace('.', ',')} className="input" /></Field>
+                                    <Field label="Valor recebido"><MoneyInput name="paid" defaultCents={inv.amountCents} /></Field>
                                     <Field label="Data"><input type="date" name="paidAt" defaultValue={today} className="input" /></Field>
                                     <Field label="Forma"><select name="method" className="input" defaultValue="pix">{Object.entries(METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
                                   </div>
@@ -218,8 +237,13 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                                 </Modal>
                               )}
                               {!inv.bankChargeId && (
-                                <Modal trigger={<CalendarRange size={15} />} triggerClass="btn-icon" titleAttr="Alterar vencimento" title="Alterar vencimento">
-                                  <ActionForm action={changeDueDate}><input type="hidden" name="id" value={inv.id} /><Field label="Novo vencimento"><input type="date" name="dueDate" required defaultValue={inv.dueDate} className="input" /></Field></ActionForm>
+                                <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar fatura" title={`Editar fatura ${inv.number}`} wide>
+                                  <ActionForm action={updateInvoice}>
+                                    <input type="hidden" name="id" value={inv.id} />
+                                    <Field label="Vencimento"><input type="date" name="dueDate" required defaultValue={inv.dueDate} className="input" /></Field>
+                                    <InvoiceItems initial={invoiceItems(inv)} services={services} />
+                                    <Field label="Observações"><textarea name="notes" rows={2} defaultValue={inv.notes} className="input" /></Field>
+                                  </ActionForm>
                                 </Modal>
                               )}
                               <Confirm trigger={<Ban size={15} />} titleAttr="Cancelar fatura" title={`Cancelar a fatura ${inv.number}?`} confirmLabel="Sim, cancelar" action={cancelInvoice} fields={{ id: inv.id }}

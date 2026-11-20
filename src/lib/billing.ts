@@ -6,7 +6,7 @@ import { localDate, parseJson } from './util';
 import { asaas, BankError, PAID_STATUSES, type AsaasEnv } from './bank/asaas';
 import { afterPlatformInvoiceChange } from './tenant';
 
-export type InvoiceItem = { description: string; quantity: number; unitCents: number };
+export type InvoiceItem = { description: string; unit?: string; quantity: number; unitCents: number };
 export const invoiceItems = (inv: Pick<Invoice, 'items'>) => parseJson<InvoiceItem[]>(inv.items, []);
 export const itemsTotal = (items: InvoiceItem[]) => items.reduce((a, i) => a + Math.round(i.quantity * i.unitCents), 0);
 

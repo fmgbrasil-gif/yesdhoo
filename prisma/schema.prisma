@@ -17,6 +17,20 @@ model Tenant {
   isPlatform     Boolean   @default(false) // a conta dona do sistema
   slug           String?   @unique         // endereco de login personalizado: /login?empresa=slug
   document       String?                   // CNPJ
+  tradeName      String?                   // nome fantasia
+  stateRegistration String?                // inscricao estadual
+  email          String?
+  phone          String?
+  road           String?
+  number         String?
+  complement     String?
+  neighborhood   String?
+  zipcode        String?
+  city           String?
+  state          String?
+  invoiceTitle   String    @default("FATURA DE SERVIÇOS")
+  invoiceNature  String    @default("VEICULAÇÃO DE MÍDIA INDOOR")
+  invoiceFiscal  String    @default("")    // informacoes fiscais no rodape da fatura
   logo           String?
   color          String    @default("#8a52f8") // cor da marca no painel (padrao: violeta da Yes)
   status         String    @default("ativo")   // ativo | bloqueado
@@ -39,6 +53,7 @@ model Tenant {
   invoices   Invoice[]
   subscriptions Subscription[]
   contracts  Contract[]
+  services   Service[]
   screens    Screen[]
   clients    Client[]
   medias     Media[]
@@ -101,6 +116,8 @@ model Client {
   kind         String   @default("cliente") // cliente (anunciante) | parceiro (ponto onde fica a tela)
   document     String?
   name         String
+  tradeName    String?  // nome fantasia
+  stateRegistration String?
   email        String?
   phone1       String?
   phone2       String?
@@ -162,6 +179,18 @@ model Contract {
   body           String
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+}
+
+// Catalogo de servicos prestados (atalho para preencher os itens das cobrancas).
+model Service {
+  id         String   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name       String
+  unit       String   @default("mês")
+  priceCents Int
+  createdAt  DateTime @default(now())
+  @@index([tenantId])
 }
 
 // Fatura (conta a receber). Valores em centavos.

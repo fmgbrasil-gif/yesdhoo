@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Avatar, Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { deleteClient, saveClient, toggleClient } from './actions';
+import { CnpjLookup } from '@/components/CnpjLookup';
 
 function ClientFields({ c }: { c?: Client }) {
   const f = (name: keyof Client, label: string, cls = '', extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -27,8 +28,10 @@ function ClientFields({ c }: { c?: Client }) {
         <Field label="Tipo" className="col-span-2">
           <select name="type" defaultValue={c?.type ?? 'PJ'} className="input"><option value="PJ">Jurídica</option><option value="PF">Física</option></select>
         </Field>
-        {f('document', 'CPF / CNPJ', 'col-span-4')}
-        {f('name', 'Nome', 'col-span-6', { required: true, placeholder: 'Ex.: Padaria Pão Quente' })}
+        <Field label="CPF / CNPJ" hint="Com CNPJ, os dados são buscados na Receita Federal" className="col-span-4"><CnpjLookup defaultValue={c?.document} /></Field>
+        {f('name', 'Nome / razão social', 'col-span-6', { required: true, placeholder: 'Ex.: Padaria Pão Quente Ltda' })}
+        {f('tradeName', 'Nome fantasia', 'col-span-3')}
+        {f('stateRegistration', 'Inscrição estadual', 'col-span-3')}
         <Field label="Imagem / logo" className="col-span-6"><input type="file" name="image" accept="image/*" className="input" /></Field>
         {f('email', 'E-mail', 'col-span-6', { type: 'email' })}
         {f('phone1', 'Telefone 1', 'col-span-3')}

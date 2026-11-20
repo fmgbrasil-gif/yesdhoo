@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Field } from './ui';
-import { InvoiceItems } from './InvoiceItems';
+import { InvoiceItems, type ServiceOpt } from './InvoiceItems';
 
 type Opt = { id: string; name: string; kind: string };
 const MODES = [
@@ -12,7 +12,7 @@ const MODES = [
 ] as const;
 
 /** Campos da nova cobranca; o tipo escolhido mostra os campos de data certos. */
-export function ChargeFields({ clients, today }: { clients: Opt[]; today: string }) {
+export function ChargeFields({ clients, today, services }: { clients: Opt[]; today: string; services: ServiceOpt[] }) {
   const [mode, setMode] = useState<(typeof MODES)[number]['key']>('recorrente');
   const month = today.slice(0, 7);
   return (
@@ -50,7 +50,7 @@ export function ChargeFields({ clients, today }: { clients: Opt[]; today: string
         )}
       </div>
       <p className="label -mb-1">{mode === 'avulsa' ? 'Itens da fatura' : 'Itens de cada mês'}</p>
-      <InvoiceItems />
+      <InvoiceItems services={services} />
       <Field label="Observações (aparecem nas faturas)"><textarea name="notes" rows={2} className="input" /></Field>
     </>
   );

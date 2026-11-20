@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/basic';
 import { ActionForm, Field } from '@/components/ui';
 import { CopyButton } from '@/components/CopyButton';
 import { rotateWebhookToken, saveBank, saveCompany, savePix } from './actions';
+import { CnpjLookup } from '@/components/CnpjLookup';
+import { STATES } from '@/lib/constants';
 
 export default async function EmpresaPage() {
   const user = await requireAdmin();
@@ -25,10 +27,23 @@ export default async function EmpresaPage() {
           <h2 className="mb-4 flex items-center gap-2 font-bold"><Building2 size={18} /> Dados e identidade visual</h2>
           <ActionForm action={saveCompany}>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Nome da empresa" className="sm:col-span-2"><input name="name" required defaultValue={t.name} className="input" /></Field>
-              <Field label="CNPJ"><input name="document" defaultValue={t.document ?? ''} className="input" inputMode="numeric" /></Field>
-              <Field label="Cor da marca" hint="Usada nos botões, no menu e nas faturas"><input type="color" name="color" defaultValue={t.color} className="h-10 w-full rounded-lg" /></Field>
+              <Field label="CNPJ" hint="Busca razão social, endereço e contato na Receita" className="sm:col-span-2"><CnpjLookup defaultValue={t.document} /></Field>
+              <Field label="Razão social" className="sm:col-span-2"><input name="name" required defaultValue={t.name} className="input" /></Field>
+              <Field label="Nome fantasia"><input name="tradeName" defaultValue={t.tradeName ?? ''} className="input" /></Field>
+              <Field label="Inscrição estadual"><input name="stateRegistration" defaultValue={t.stateRegistration ?? ''} className="input" /></Field>
+              <Field label="E-mail"><input name="email" type="email" defaultValue={t.email ?? ''} className="input" /></Field>
+              <Field label="Telefone"><input name="phone" defaultValue={t.phone ?? ''} className="input" /></Field>
             </div>
+            <div className="grid grid-cols-6 gap-3">
+              <Field label="Endereço" className="col-span-4"><input name="road" defaultValue={t.road ?? ''} className="input" /></Field>
+              <Field label="Número" className="col-span-2"><input name="number" defaultValue={t.number ?? ''} className="input" /></Field>
+              <Field label="Complemento" className="col-span-3"><input name="complement" defaultValue={t.complement ?? ''} className="input" /></Field>
+              <Field label="Bairro" className="col-span-3"><input name="neighborhood" defaultValue={t.neighborhood ?? ''} className="input" /></Field>
+              <Field label="CEP" className="col-span-2"><input name="zipcode" defaultValue={t.zipcode ?? ''} className="input" /></Field>
+              <Field label="Cidade" className="col-span-3"><input name="city" defaultValue={t.city ?? ''} className="input" /></Field>
+              <Field label="UF" className="col-span-1"><select name="state" defaultValue={t.state ?? ''} className="input"><option value="">—</option>{STATES.map((uf) => <option key={uf}>{uf}</option>)}</select></Field>
+            </div>
+            <Field label="Cor da marca" hint="Usada nos botões, no menu e nas faturas"><input type="color" name="color" defaultValue={t.color} className="h-10 w-32 rounded-lg" /></Field>
             <div className="flex items-center gap-4">
               {t.logo && <img src={fileUrl(t.logo)!} alt="Logo atual" className="h-16 w-16 rounded-lg bg-ink-100 object-contain p-1" />}{/* eslint-disable-line @next/next/no-img-element */}
               <Field label="Logo" hint="PNG, JPG ou WEBP de até 2 MB. Quadrada fica melhor." className="flex-1"><input type="file" name="logo" accept="image/png,image/jpeg,image/webp" className="input" /></Field>
@@ -53,7 +68,13 @@ export default async function EmpresaPage() {
               <Field label="Nome do recebedor" hint="Como aparece no app do banco"><input name="pixName" maxLength={25} defaultValue={t.pixName ?? t.name} className="input" /></Field>
               <Field label="Cidade"><input name="pixCity" maxLength={15} defaultValue={t.pixCity ?? ''} className="input" /></Field>
             </div>
-            <Field label="Texto padrão no rodapé das faturas" hint="Ex.: dados para transferência, contato do financeiro"><textarea name="invoiceNotes" rows={2} defaultValue={t.invoiceNotes} className="input" /></Field>
+            <p className="pt-2 text-sm font-semibold">Modelo da fatura</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Título da fatura"><input name="invoiceTitle" defaultValue={t.invoiceTitle} className="input" /></Field>
+              <Field label="Natureza da operação"><input name="invoiceNature" defaultValue={t.invoiceNature} className="input" /></Field>
+            </div>
+            <Field label="Informações fiscais" hint="Aparece no rodapé, ao lado do total. Confirme o texto com seu contador."><textarea name="invoiceFiscal" rows={2} defaultValue={t.invoiceFiscal} className="input" /></Field>
+            <Field label="Dados adicionais padrão" hint="Ex.: dados para transferência, contato do financeiro"><textarea name="invoiceNotes" rows={2} defaultValue={t.invoiceNotes} className="input" /></Field>
           </ActionForm>
         </section>
 

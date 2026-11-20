@@ -7,8 +7,10 @@ import { db } from '@/lib/db';
 import { str } from '@/lib/util';
 import { parseMoney } from '@/lib/money';
 import { BankError } from '@/lib/bank/asaas';
-import { cancelBoleto, cancelSubscription, createInvoice, createSubscription, issueBoleto, markPaid, METHODS, syncBoleto, type InvoiceItem } from '@/lib/billing';
-import { ContractError, draftContract } from '@/lib/ai-contract';
+import { cancelBoleto, cancelSubscription, competenceLabel, createInvoice, createSubscription, dueFor, issueBoleto, itemsTotal, markPaid, METHODS, syncBoleto, type InvoiceItem } from '@/lib/billing';
+import { localDate } from '@/lib/util';
+import { ContractError, draftContract, type Attachment } from '@/lib/ai-contract';
+import { isUpload } from '@/lib/storage';
 import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
 
@@ -19,18 +21,20 @@ async function ownInvoice(tenantId: string, id: string) {
 }
 
 function readItems(fd: FormData): InvoiceItem[] | string {
-  let raw: { description?: string; quantity?: string; unit?: string }[];
+  let raw: { description?: string; quantity?: string; unit?: string; price?: string }[];
   try { raw = JSON.parse(String(fd.get('items') || '[]')); } catch { return 'Itens inválidos.'; }
   const items: InvoiceItem[] = [];
   for (const r of raw) {
     const description = String(r.description ?? '').trim().slice(0, 200);
     const quantity = Number(String(r.quantity ?? '1').replace(',', '.'));
-    const unitCents = parseMoney(r.unit);
-    if (!description && !r.unit) continue;
+    const unitCents = parseMoney(r.price);
+    const unit = String(r.unit ?? '').trim().slice(0, 12) || 'un';
+    if (!description && !unitCents) continue;
     if (!description) return 'Preencha a descrição de todos os itens.';
     if (!Number.isFinite(quantity) || quantity <= 0) return `Quantidade inválida em “${description}”.`;
     if (unitCents == null) return `Valor inválido em “${description}”. Use o formato 1.500,00.`;
-    items.push({ description, quantity, unitCents });
+    if (!unitCents) return `Informe o valor de “${description}”.`;
+    items.push({ description, unit, quantity, unitCents });
   }
   if (!items.length) return 'Inclua ao menos um item na fatura.';
   return items;
@@ -87,9 +91,17 @@ export async function generateContract(_: ActionResult, fd: FormData): Promise<A
     where: { tenantId: user.tenantId, OR: [{ clientId: client.id }, { items: { some: { media: { clientId: client.id } } } }] },
     select: { name: true, city: true, state: true }, orderBy: { name: 'asc' }, take: 30,
   })).map((s) => [s.name, s.city && `${s.city}${s.state ? '/' + s.state : ''}`].filter(Boolean).join(' — '));
+  // anexos opcionais: PDF ou imagens, ate 5 arquivos e 4 MB no total (limite de envio do servidor)
+  const files = fd.getAll('attachments').filter(isUpload);
+  const ALLOWED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  if (files.length > 5) return { error: 'Anexe no máximo 5 arquivos.' };
+  if (files.reduce((a, f) => a + f.size, 0) > 4 * 1024 * 1024) return { error: 'Os anexos passam de 4 MB. Envie arquivos menores ou menos arquivos.' };
+  const bad = files.find((f) => !ALLOWED.includes(f.type));
+  if (bad) return { error: `“${bad.name}” não é PDF nem imagem (PNG, JPG, WEBP ou GIF).` };
+  const attachments: Attachment[] = await Promise.all(files.map(async (f) => ({ name: f.name, mime: f.type, data: Buffer.from(await f.arrayBuffer()).toString('base64') })));
   let body: string;
   try {
-    body = await draftContract(user.tenant, client, sub, String(fd.get('extra') ?? ''), screens);
+    body = await draftContract(user.tenant, client, sub, String(fd.get('extra') ?? ''), screens, attachments);
   } catch (e) {
     if (e instanceof ContractError) return { error: e.message };
     throw e;
@@ -188,4 +200,50 @@ export async function syncInvoice(_: ActionResult, fd: FormData): Promise<Action
     if (e instanceof BankError) return { error: e.message };
     throw e;
   }
+}
+
+/** Edita uma fatura em aberto sem boleto: itens, vencimento e observacoes. */
+export async function updateInvoice(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const inv = await ownInvoice(user.tenantId, String(fd.get('id')));
+  if (!inv || inv.status !== 'aberta') return { error: 'Só é possível editar faturas em aberto.' };
+  if (inv.bankChargeId) return { error: 'Esta fatura tem boleto emitido no banco. Cancele-a e crie outra com os dados certos.' };
+  const dueDate = str(fd, 'dueDate');
+  if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe o vencimento.' };
+  const items = readItems(fd);
+  if (typeof items === 'string') return { error: items };
+  await db.invoice.update({ where: { id: inv.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDate, notes: str(fd, 'notes') ?? '' } });
+  await afterPlatformInvoiceChange(inv.clientId);
+  revalidatePath('/', 'layout');
+  return { ok: true };
+}
+
+/**
+ * Edita uma cobranca por periodo/recorrente: itens, dia de vencimento e observacoes valem para as proximas faturas.
+ * Opcionalmente aplica tambem as faturas em aberto que ainda nao venceram (e sem boleto emitido).
+ */
+export async function updateCharge(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const sub = await db.subscription.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId, status: 'ativa' } });
+  if (!sub) return { error: 'Cobrança não encontrada ou cancelada.' };
+  const items = readItems(fd);
+  if (typeof items === 'string') return { error: items };
+  const dueDay = Number(str(fd, 'dueDay'));
+  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return { error: 'O dia de vencimento deve ficar entre 1 e 28.' };
+  const notes = str(fd, 'notes') ?? '';
+  const updated = await db.subscription.update({ where: { id: sub.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDay, notes } });
+  let changed = 0;
+  if (fd.get('applyOpen') === 'on') {
+    const open = await db.invoice.findMany({ where: { subscriptionId: sub.id, status: 'aberta', bankChargeId: null, dueDate: { gte: localDate() } } });
+    for (const inv of open) {
+      const ym = inv.competence!;
+      const tag = sub.mode === 'periodo' ? ` — parcela ${inv.installment}/${sub.months} (${competenceLabel(ym)})` : ` — ${competenceLabel(ym)}`;
+      const its = items.map((it) => ({ ...it, description: it.description + tag }));
+      await db.invoice.update({ where: { id: inv.id }, data: { items: JSON.stringify(its), amountCents: itemsTotal(its), dueDate: dueFor(ym, dueDay), notes } });
+      changed++;
+    }
+  }
+  void updated;
+  revalidatePath('/', 'layout');
+  return { ok: true, message: changed ? `Cobrança atualizada e ${changed} fatura(s) em aberto ajustadas.` : 'Cobrança atualizada. Vale para as próximas faturas.' };
 }

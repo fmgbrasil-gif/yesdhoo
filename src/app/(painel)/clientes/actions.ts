@@ -19,7 +19,7 @@ export async function saveClient(_: ActionResult, fd: FormData): Promise<ActionR
   if (isUpload(fd.get('image'))) { await removeFile(image); image = await saveFile(fd.get('image') as File, 'clientes'); }
   const data = {
     kind: fd.get('kind') === 'parceiro' ? 'parceiro' : 'cliente',
-    name, image, type: fd.get('type') === 'PF' ? 'PF' : 'PJ', document: str(fd, 'document')?.replace(/\D/g, '') ?? null, email: str(fd, 'email'),
+    name, image, type: fd.get('type') === 'PF' ? 'PF' : 'PJ', tradeName: str(fd, 'tradeName'), stateRegistration: str(fd, 'stateRegistration'), document: str(fd, 'document')?.replace(/\D/g, '') ?? null, email: str(fd, 'email'),
     phone1: str(fd, 'phone1'), phone2: str(fd, 'phone2'), road: str(fd, 'road'), number: str(fd, 'number'), complement: str(fd, 'complement'),
     neighborhood: str(fd, 'neighborhood'), zipcode: str(fd, 'zipcode'), city: str(fd, 'city'), state: str(fd, 'state'),
   };

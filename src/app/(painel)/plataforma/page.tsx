@@ -6,7 +6,8 @@ import { requireSuperAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { localDate, timeAgo } from '@/lib/util';
 import { fileUrl } from '@/lib/storage';
-import { fmtMoney, moneyInput } from '@/lib/money';
+import { fmtMoney } from '@/lib/money';
+import { MoneyInput } from '@/components/MoneyInput';
 import { enforceBilling } from '@/lib/tenant';
 import { Avatar, Empty, PageHeader } from '@/components/basic';
 import { ActionForm, Field, Modal } from '@/components/ui';
@@ -26,7 +27,7 @@ function TenantFields({ t, fee, dueDay }: { t?: Tenant; fee?: number | null; due
       </div>
       <div className="grid gap-3 rounded-lg bg-ink-50 p-3 sm:grid-cols-3 dark:bg-ink-900">
         <p className="text-sm font-semibold sm:col-span-3">Cobrança desta empresa</p>
-        <Field label="Mensalidade (R$)"><input name="monthlyFee" inputMode="decimal" defaultValue={moneyInput(fee)} className="input" placeholder="490,00" /></Field>
+        <Field label="Mensalidade" hint="0,00 = sem mensalidade"><MoneyInput name="monthlyFee" defaultCents={fee} /></Field>
         <Field label="Dia do vencimento"><input type="number" name="dueDay" min={1} max={28} defaultValue={dueDay ?? 10} className="input" /></Field>
         <Field label="Bloquear após (dias de atraso)" hint="Em branco = nunca bloquear sozinho"><input type="number" name="autoBlockDays" min={0} max={90} defaultValue={t ? (t.autoBlockDays ?? '') : 5} className="input" /></Field>
       </div>
