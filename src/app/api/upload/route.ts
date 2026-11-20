@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       request: req,
       onBeforeGenerateToken: async () => {
         const user = await getUser();
-        if (!user || user.mustChangePassword) throw new Error('Não autorizado');
+        if (!user || user.mustChangePassword || (user.tenant.status === 'bloqueado' && !user.superAdmin)) throw new Error('Não autorizado');
         return {
           allowedContentTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime'],
           maximumSizeInBytes: 500 * 1024 * 1024,

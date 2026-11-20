@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { isOnline } from '@/lib/util';
 import { fileUrl } from '@/lib/storage';
 import { refreshNotifications } from '@/lib/notifications';
+import { brandCss } from '@/lib/tenant';
 import { Sidebar } from '@/components/Sidebar';
 import { logout } from '../login/actions';
 
@@ -24,8 +25,10 @@ export default async function PainelLayout({ children }: { children: React.React
 
   return (
     <div className="lg:flex">
+      <style dangerouslySetInnerHTML={{ __html: brandCss(user.tenant.color) }} />
       <Sidebar
-        user={{ name: user.name, email: user.email, image: fileUrl(user.image), role: user.role }}
+        user={{ name: user.name, email: user.email, image: fileUrl(user.image), role: user.role, superAdmin: user.superAdmin }}
+        company={{ name: user.tenant.name, logo: fileUrl(user.tenant.logo) }}
         favorites={favorites.map((f) => ({ id: f.id, name: f.name, online: isOnline(f.lastSeenAt) }))}
         notifications={notifications.map((n) => ({ id: n.id, message: n.message, link: n.link, read: n.read }))}
         logout={logout}

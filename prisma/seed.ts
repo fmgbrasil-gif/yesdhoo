@@ -19,7 +19,19 @@ async function poster(key: string, title: string, sub: string, bg: string, fg: s
 }
 
 async function main() {
-  if (await db.user.count()) { console.log('Banco já possui dados — seed ignorado.'); return; }
+  if (await db.user.count()) {
+    // Banco ja existente: garante que o dono da plataforma (ADMIN_EMAIL, ou o primeiro administrador) tem o papel de plataforma.
+    const owner = (process.env.ADMIN_EMAIL && (await db.user.findUnique({ where: { email: process.env.ADMIN_EMAIL.trim().toLowerCase() } })))
+      || (await db.user.findFirst({ where: { role: 'admin' }, orderBy: { createdAt: 'asc' } }));
+    if (owner && !(await db.user.count({ where: { superAdmin: true } }))) {
+      await db.user.update({ where: { id: owner.id }, data: { superAdmin: true } });
+      const t = await db.tenant.update({ where: { id: owner.tenantId }, data: { isPlatform: true } });
+      if (!t.slug) await db.tenant.update({ where: { id: t.id }, data: { slug: t.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'principal' } });
+      console.log(`Dono da plataforma: ${owner.email}`);
+    }
+    console.log('Banco já possui dados — seed ignorado.');
+    return;
+  }
 
   for (const name of SEGMENTS) await db.category.upsert({ where: { name }, create: { name }, update: {} });
   const cat = Object.fromEntries((await db.category.findMany()).map((c) => [c.name, c.id]));
@@ -28,11 +40,11 @@ async function main() {
   const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
   const production = !!adminEmail;
   if (production && (process.env.ADMIN_PASSWORD ?? '').length < 8) throw new Error('Defina ADMIN_PASSWORD (mínimo de 8 caracteres) junto com ADMIN_EMAIL.');
-  const tenant = await db.tenant.create({ data: { name: process.env.TENANT_NAME || (production ? 'Minha rede' : 'Rede Demonstração'), planScreens: Number(process.env.PLAN_SCREENS) || (production ? 50 : 12) } });
+  const tenant = await db.tenant.create({ data: { name: process.env.TENANT_NAME || (production ? 'Minha rede' : 'Rede Demonstração'), planScreens: Number(process.env.PLAN_SCREENS) || (production ? 50 : 12), isPlatform: true, slug: production ? 'principal' : 'demo' } });
   await db.user.create({
     data: {
       tenantId: tenant.id, name: 'Administrador', role: 'admin', email: adminEmail ?? 'admin@yesdooh.com.br',
-      passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD ?? 'yesdooh123', 12), mustChangePassword: production,
+      passwordHash: await bcrypt.hash(process.env.ADMIN_PASSWORD ?? 'yesdooh123', 12), mustChangePassword: production, superAdmin: true,
     },
   });
 

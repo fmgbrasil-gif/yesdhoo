@@ -2,9 +2,10 @@ import type { Media } from '@prisma/client';
 import { Field, MultiPicker, Tabs, Toggle, WeekDaysPicker } from './ui';
 import { parseJson } from '@/lib/util';
 import { MediaUpload } from './MediaUpload';
+import { OriginPicker } from './OriginPicker';
 
 type Opt = { id: string; name: string };
-export type MediaFormData = { clients: Opt[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[]; remote: boolean };
+export type MediaFormData = { clients: (Opt & { kind: string })[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[]; remote: boolean };
 
 function Colors({ fields, cfg }: { fields: [string, string, string][]; cfg: Record<string, string> }) {
   return (
@@ -29,7 +30,7 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
       {!util && <Field label={type === 'rss' ? 'Título' : 'Nome'}><input name="name" required maxLength={75} defaultValue={m?.name} className="input" placeholder={type === 'aviso' ? 'Ex.: Aviso de funcionamento' : type === 'rss' ? 'Ex.: Notícias de esporte' : 'Ex.: Campanha de Natal'} /></Field>}
       {['arquivo', 'youtube', 'link'].includes(type) && (
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cliente"><select name="clientId" defaultValue={m?.clientId ?? ''} className="input"><option value="">Avulso</option>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+          <OriginPicker clients={data.clients} defaultClientId={m ? m.clientId : undefined} />
           <Field label="Categoria"><select name="categoryId" defaultValue={m?.categoryId ?? ''} className="input"><option value="">Selecione</option>{data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
         </div>
       )}

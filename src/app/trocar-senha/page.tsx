@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getUser } from '@/lib/auth';
+import { brandCss } from '@/lib/tenant';
 import { ActionForm, Field } from '@/components/ui';
 import { changeFirstPassword, logout } from '../login/actions';
 
@@ -9,6 +10,7 @@ export default async function TrocarSenhaPage() {
   if (!user.mustChangePassword) redirect('/dashboard');
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
+      <style dangerouslySetInnerHTML={{ __html: brandCss(user.tenant.color) }} />
       <div className="card w-full max-w-sm p-6">
         <h1 className="mb-1">Crie sua senha</h1>
         <p className="mb-5 text-sm text-ink-400">Olá, {user.name}. Você entrou com uma senha provisória. Defina uma senha só sua para continuar.</p>

@@ -7,7 +7,7 @@ import type { MediaFormData } from '@/components/MediaForm';
 /** Opcoes compartilhadas pelos formularios de conteudo. */
 export async function mediaFormData(user: SessionUser): Promise<MediaFormData> {
   const [clients, categories, screens] = await Promise.all([
-    db.client.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    db.client.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
     db.category.findMany({ orderBy: { name: 'asc' } }),
     db.screen.findMany({ where: screenScope(user), orderBy: { name: 'asc' }, select: { id: true, name: true, orientation: true } }),
   ]);

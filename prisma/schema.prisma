@@ -13,7 +13,30 @@ model Tenant {
   name       String
   planScreens Int     @default(10)
   createdAt  DateTime @default(now())
+  // --- plataforma (aluguel do sistema para outras empresas) ---
+  isPlatform     Boolean   @default(false) // a conta dona do sistema
+  slug           String?   @unique         // endereco de login personalizado: /login?empresa=slug
+  document       String?                   // CNPJ
+  logo           String?
+  color          String    @default("#f0b000") // cor da marca no painel
+  status         String    @default("ativo")   // ativo | bloqueado
+  blockedReason  String?
+  blockedAt      DateTime?
+  blockedAuto    Boolean   @default(false)     // bloqueio feito pelo sistema por atraso
+  autoBlockDays  Int?                          // bloquear sozinho apos N dias de fatura vencida
+  billingClientId String?  @unique             // cliente que representa esta empresa na conta da plataforma
+  // --- cobranca desta empresa para os clientes dela ---
+  pixKey         String?
+  pixName        String?
+  pixCity        String?
+  bankProvider   String?                       // asaas
+  bankEnv        String    @default("sandbox") // sandbox | producao
+  bankApiKey     String?                       // criptografada
+  bankWebhookToken String?
+  invoiceSeq     Int       @default(0)
+  invoiceNotes   String    @default("")
   users      User[]
+  invoices   Invoice[]
   screens    Screen[]
   clients    Client[]
   medias     Media[]
@@ -31,6 +54,7 @@ model User {
   image        String?
   timezone     String   @default("America/Sao_Paulo")
   role         String   @default("admin") // admin | operador
+  superAdmin   Boolean  @default(false)   // dono da plataforma: cria e bloqueia empresas
   restricted   Boolean  @default(false)   // restringe acesso a conteudos privados
   active       Boolean  @default(true)
   notes        String   @default("")
@@ -72,6 +96,7 @@ model Client {
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   type         String   @default("PJ") // PF | PJ
+  kind         String   @default("cliente") // cliente (anunciante) | parceiro (ponto onde fica a tela)
   document     String?
   name         String
   email        String?
@@ -85,9 +110,43 @@ model Client {
   zipcode      String?
   city         String?
   state        String?
+  monthlyFeeCents Int?    // mensalidade (gera fatura todo mes)
+  dueDay       Int?       // dia do vencimento
+  bankCustomerId String?  // cadastro do cliente no banco integrado
   createdAt    DateTime @default(now())
   medias       Media[]
   screens      Screen[]
+  invoices     Invoice[]
+}
+
+// Fatura (conta a receber). Valores em centavos.
+model Invoice {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  number       Int
+  items        String    @default("[]") // JSON: [{ description, quantity, unitCents }]
+  amountCents  Int
+  dueDate      String    // YYYY-MM-DD
+  competence   String?   // YYYY-MM quando gerada pela mensalidade
+  status       String    @default("aberta") // aberta | paga | cancelada
+  paidAt       DateTime?
+  paidCents    Int?
+  paymentMethod String?  // pix | boleto | dinheiro | transferencia | cartao
+  notes        String    @default("")
+  publicToken  String    @unique // link da fatura para o cliente pagar
+  txid         String
+  bankChargeId String?
+  boletoUrl    String?
+  boletoLine   String?
+  bankPixPayload String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  @@unique([tenantId, number])
+  @@unique([tenantId, clientId, competence])
+  @@index([tenantId, status, dueDate])
 }
 
 model Screen {

@@ -17,14 +17,19 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const user = await requireUser();
   const { page, size, skip, take } = pageParams(sp);
+  const origem = ['cliente', 'parceiro', 'institucional'].includes(sp.origem ?? '') ? sp.origem : undefined;
+  const base = { tenantId: user.tenantId, type: { in: TYPES } };
+  const byOrigin = (o?: string) => (o === 'institucional' ? { clientId: null } : o ? { client: { kind: o } } : {});
   const where = {
-    tenantId: user.tenantId, type: { in: TYPES },
+    ...base, ...byOrigin(origem),
     ...(sp.q ? { name: like(sp.q) } : {}),
     ...(sp.cliente ? { client: { name: like(sp.cliente) } } : {}),
     ...(sp.status === 'ativo' ? { active: true } : sp.status === 'inativo' ? { active: false } : {}),
   };
+  const counts = await Promise.all(['cliente', 'parceiro', 'institucional'].map((o) => db.media.count({ where: { ...base, ...byOrigin(o) } })));
+  const tabs: [string | undefined, string, number][] = [[undefined, 'Todas', counts[0] + counts[1] + counts[2]], ['cliente', 'Clientes', counts[0]], ['parceiro', 'Parceiros', counts[1]], ['institucional', 'Institucional', counts[2]]];
   const [rows, total, data] = await Promise.all([
-    db.media.findMany({ where, skip, take, orderBy: { updatedAt: 'desc' }, include: { client: { select: { name: true } }, items: { select: { screenId: true } } } }),
+    db.media.findMany({ where, skip, take, orderBy: { updatedAt: 'desc' }, include: { client: { select: { name: true, kind: true } }, items: { select: { screenId: true } } } }),
     db.media.count({ where }),
     mediaFormData(user),
   ]);
@@ -38,9 +43,15 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
         </Modal>
       </PageHeader>
       <div className="card overflow-hidden">
+        <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700" aria-label="Filtrar por origem">
+          {tabs.map(([k, label, n]) => (
+            <Link key={label} href={k ? `/midias?origem=${k}` : '/midias'} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${origem === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label} <span className="opacity-70">{n}</span></Link>
+          ))}
+        </div>
         <form className="flex flex-wrap gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
+          {origem && <input type="hidden" name="origem" value={origem} />}
           <input name="q" defaultValue={sp.q} placeholder="Buscar por nome..." className="input w-48" aria-label="Nome" />
-          <input name="cliente" defaultValue={sp.cliente} placeholder="Buscar por cliente..." className="input w-48" aria-label="Cliente" />
+          <input name="cliente" defaultValue={sp.cliente} placeholder="Buscar por cliente ou parceiro..." className="input w-56" aria-label="Cliente ou parceiro" />
           <select name="status" defaultValue={sp.status ?? ''} className="input w-32" aria-label="Status"><option value="">Todos</option><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select>
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>
         </form>
@@ -60,7 +71,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
                             {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : MEDIA_TYPES[m.type]}{/* eslint-disable-line @next/next/no-img-element */}
                             <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[10px] text-white">{fmtDuration(m.duration)}</span>
                           </span>
-                          <span><span className="block font-semibold">{m.name}</span><span className="text-xs text-ink-400">{m.type === 'arquivo' ? (m.kind === 'video' ? 'Vídeo' : 'Imagem') : MEDIA_TYPES[m.type]} · {m.client?.name ?? 'Avulso'}</span></span>
+                          <span><span className="block font-semibold">{m.name}</span><span className="text-xs text-ink-400">{m.type === 'arquivo' ? (m.kind === 'video' ? 'Vídeo' : 'Imagem') : MEDIA_TYPES[m.type]} · {m.client ? <>{m.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}: {m.client.name}</> : 'Institucional'}</span></span>
                         </Link>
                       </td>
                       <td className="td font-semibold">{onScreens.length}</td>

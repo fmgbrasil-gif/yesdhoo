@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, PanelLeftOpen,
+  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
 
 type Notif = { id: string; message: string; link: string | null; read: boolean };
 type Props = {
-  user: { name: string; email: string; image: string | null; role: string };
+  user: { name: string; email: string; image: string | null; role: string; superAdmin: boolean };
+  company: { name: string; logo: string | null };
   favorites: { id: string; name: string; online: boolean }[];
   notifications: Notif[];
   logout: () => Promise<void>;
@@ -30,12 +31,16 @@ const NAV = [
   { href: '/utilitarios', label: 'Utilitários', icon: Wrench },
   { href: '/instagram', label: 'Instagram', icon: Camera },
   { group: 'Gestão' },
-  { href: '/clientes', label: 'Clientes', icon: Users },
+  { href: '/clientes', label: 'Clientes e parceiros', icon: Users },
+  { href: '/financeiro', label: 'Financeiro', icon: Wallet, admin: true },
   { href: '/relatorios', label: 'Relatório de exibições', icon: FileBarChart },
   { href: '/usuarios', label: 'Usuários', icon: UserCog, admin: true },
+  { href: '/empresa', label: 'Minha empresa', icon: Building2, admin: true },
+  { group: 'Plataforma', superAdmin: true },
+  { href: '/plataforma', label: 'Empresas clientes', icon: Crown, superAdmin: true },
 ] as const;
 
-export function Sidebar({ user, favorites, notifications, logout, markRead }: Props) {
+export function Sidebar({ user, company, favorites, notifications, logout, markRead }: Props) {
   const path = usePathname();
   const [open, setOpen] = useState(false); // gaveta no celular
   const [mini, setMini] = useState(false);
@@ -67,18 +72,23 @@ export function Sidebar({ user, favorites, notifications, logout, markRead }: Pr
       {open && <div className="fixed inset-0 z-30 bg-ink-950/60 lg:hidden" onClick={() => setOpen(false)} />}
       <aside className={`fixed inset-y-0 left-0 z-40 flex ${mini ? 'lg:w-[76px]' : 'lg:w-64'} w-72 flex-col bg-ink-900 text-ink-200 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${open ? '' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 py-5">
-          <Link href="/dashboard" aria-label="Início"><Logo compact={mini} /></Link>
+          <Link href="/dashboard" aria-label="Início" className="flex min-w-0 items-center gap-2">
+            {company.logo
+              ? <><img src={company.logo} alt="" className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5" />{!mini && <span className="truncate text-sm font-bold text-white">{company.name}</span>}</> /* eslint-disable-line @next/next/no-img-element */
+              : <Logo compact={mini} />}
+          </Link>
           <button className={`${tool} lg:hidden`} aria-label="Fechar menu" onClick={() => setOpen(false)}><X size={18} /></button>
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label="Principal">
           {NAV.map((n, i) => {
+            if ('superAdmin' in n && n.superAdmin && !user.superAdmin) return null;
             if ('group' in n) return mini ? <hr key={i} className="my-3 border-ink-700" /> : <p key={i} className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-500">{n.group}</p>;
             if ('admin' in n && n.admin && user.role !== 'admin') return null;
             const active = path === n.href || path.startsWith(n.href + '/');
             const Icon = n.icon;
             return (
               <Link key={n.href} href={n.href} title={n.label} aria-current={active ? 'page' : undefined}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${active ? 'bg-brand-400 text-ink-900' : 'hover:bg-ink-800 hover:text-white'} ${mini ? 'lg:justify-center lg:px-0' : ''}`}>
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${active ? 'bg-brand-400 text-on-brand' : 'hover:bg-ink-800 hover:text-white'} ${mini ? 'lg:justify-center lg:px-0' : ''}`}>
                 <Icon size={18} className="shrink-0" /><span className={mini ? 'lg:hidden' : ''}>{n.label}</span>
               </Link>
             );

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { SignJWT, jwtVerify } from 'jose';
 import { cache } from 'react';
 import { db } from './db';
+import { enforceBilling } from './tenant';
 
 const COOKIE = 'yd_session';
 function secret() {
@@ -34,7 +35,13 @@ export const getUser = cache(async () => {
       include: { tenant: true, screens: { select: { screenId: true } } },
     });
     // usuario desativado ou senha trocada depois da emissao: sessao deixa de valer
-    return user && user.active && user.sessionVersion === Number(payload.sv ?? 0) ? user : null;
+    if (!user || !user.active || user.sessionVersion !== Number(payload.sv ?? 0)) return null;
+    // empresa com fatura da plataforma em atraso alem da tolerancia e bloqueada ja nesta requisicao
+    if (user.tenant.billingClientId && user.tenant.autoBlockDays != null) {
+      const t = await enforceBilling(user.tenantId);
+      if (t) user.tenant = t;
+    }
+    return user;
   } catch {
     return null;
   }
@@ -46,6 +53,14 @@ export async function requireUser() {
   const user = await getUser();
   if (!user) redirect('/login');
   if (user.mustChangePassword) redirect('/trocar-senha');
+  if (user.tenant.status === 'bloqueado' && !user.superAdmin) redirect('/bloqueado');
+  return user;
+}
+
+/** Dono da plataforma: cria, configura e bloqueia as empresas que alugam o sistema. */
+export async function requireSuperAdmin() {
+  const user = await requireUser();
+  if (!user.superAdmin) redirect('/dashboard');
   return user;
 }
 

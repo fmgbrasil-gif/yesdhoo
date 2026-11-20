@@ -34,7 +34,7 @@ export default async function TelasPage({ searchParams }: { searchParams: Promis
     db.client.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
   ]);
   const tab = (key: string, label: string, n: number) => (
-    <Link href={`/telas${key === 'todas' ? '' : `?status=${key}`}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${status === key ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-ink-900' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>
+    <Link href={`/telas${key === 'todas' ? '' : `?status=${key}`}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${status === key ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>
       {label} <span className="ml-1 opacity-70">{n}</span>
     </Link>
   );

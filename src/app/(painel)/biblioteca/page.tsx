@@ -23,7 +23,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
       <p className="mb-4 max-w-2xl text-sm text-ink-500">Conteúdos prontos, mantidos pela plataforma, para deixar a programação mais atrativa entre um anúncio e outro.</p>
       <div className="mb-5 flex flex-wrap gap-1">
         {Object.entries(LIBRARY_SECTIONS).map(([k, label]) => (
-          <Link key={k} href={`/biblioteca?secao=${k}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${k === section ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-ink-900' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
+          <Link key={k} href={`/biblioteca?secao=${k}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${k === section ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
         ))}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

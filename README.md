@@ -56,13 +56,25 @@ Para TVs montadas na vertical com o sistema em paisagem, abra `/player?girar=90`
 | Grupos de mídia | Várias mídias revezando na mesma posição da playlist |
 | Conteúdos dinâmicos | Biblioteca pronta (institucional, saúde, datas sazonais, notícias, hora certa, dólar, clima) |
 | RSS / Avisos / Utilitários | Manchetes de qualquer feed, avisos de texto com cores, hora certa, cotação do dólar e previsão do tempo |
-| Clientes | Cadastro de anunciantes (PF/PJ) vinculado às mídias |
+| Clientes e parceiros | Cadastro separado de clientes (anunciantes) e parceiros (locais das telas), com mensalidade e dia de vencimento; as mídias são separadas pela mesma origem (cliente, parceiro ou institucional) |
+| Financeiro | Contas a receber, faturas com vários itens, geração das mensalidades do mês, baixa manual, link público da fatura com QR Code Pix (Copia e Cola com valor), boleto registrado pelo Asaas com baixa automática |
+| Minha empresa | Logo, cor da marca, CNPJ, chave Pix e conexão com o banco |
+| Plataforma (dono do sistema) | Cria empresas independentes que alugam o sistema, com logo, cor, endereço de acesso próprio e limite de telas; fatura a mensalidade delas; bloqueia o acesso manualmente ou sozinho após X dias de atraso, e desbloqueia ao receber |
 | Relatório de exibições | Comprovação por tela e por mídia, com filtros e exportação CSV |
 | Usuários | Perfis administrador/operador, permissão por tela, ativação |
 | Player | Pareamento, reprodução em laço, cache local dos arquivos (continua tocando sem internet), agendamento no fuso da tela, rodapé, contagem de exibições, comandos remotos |
 
-Ainda **não** implementado: integração com Instagram (depende de app aprovado na Meta), mídia programática e cobrança
-automática de telas adicionais.
+Ainda **não** implementado: integração com Instagram (depende de app aprovado na Meta), mídia programática, envio
+automático das faturas por e-mail/WhatsApp e outros bancos além do Asaas (a integração fica em `src/lib/bank/`).
+
+### Como funciona o aluguel do sistema
+
+Cada empresa é uma conta isolada: telas, mídias, clientes, faturas e usuários não se misturam. A conta dona do
+sistema (a primeira, marcada como plataforma) cria as demais em **Empresas clientes**. Cada empresa criada vira também
+um *cliente* da plataforma, então a mensalidade dela é faturada pelo Financeiro da plataforma como qualquer outra
+fatura. Se a fatura passar do vencimento além da tolerância configurada, a empresa é bloqueada: a equipe dela vê uma
+tela com a fatura e o Pix, e o acesso volta sozinho quando o pagamento é registrado (manualmente ou pelo aviso do
+banco). As telas da empresa bloqueada continuam tocando, para não prejudicar os anunciantes dela.
 
 ## Proteção de acesso
 
