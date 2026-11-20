@@ -3,6 +3,7 @@ import type { Client, Subscription, Tenant } from '@prisma/client';
 import { fmtMoney } from './money';
 import { competenceLabel, addMonths, invoiceItems } from './billing';
 import { addressLine, fmtCep, fmtDoc } from './docs';
+import { decrypt } from './crypto';
 
 export class ContractError extends Error {}
 
@@ -70,16 +71,29 @@ function describe(t: Tenant, c: Client, sub: Subscription | null, extra: string,
 export type Attachment = { name: string; mime: string; data: string };
 
 /** Ha alguma IA configurada no servidor? (OpenAI/ChatGPT tem prioridade; Claude como alternativa) */
-export const aiConfigured = () => !!(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY);
+export const aiConfigured = (t?: Pick<Tenant, 'aiApiKey'>) => !!(openaiKey(t) || process.env.ANTHROPIC_API_KEY);
+/** Chave da OpenAI: a cadastrada em Minha empresa; senao a do servidor (OPENAI_API_KEY). */
+const openaiKey = (t?: Pick<Tenant, 'aiApiKey'>) => (t && decrypt(t.aiApiKey)) || process.env.OPENAI_API_KEY || null;
+const OPENAI_BASE = () => (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+
+/** Testa a chave da OpenAI antes de gravar. Devolve uma mensagem de erro ou null. */
+export async function checkOpenAiKey(key: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${OPENAI_BASE()}/models`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15_000) });
+    if (r.status === 401) return 'Chave inválida. Confira se copiou a chave inteira (começa com sk-).';
+    if (!r.ok) return `A OpenAI recusou a chave (erro ${r.status}).`;
+    return null;
+  } catch { return 'Não foi possível falar com a OpenAI agora. Tente de novo.'; }
+}
 
 /** Redige o contrato com o ChatGPT (API Responses da OpenAI). */
-async function draftWithOpenAI(prompt: string, attachments: Attachment[]) {
-  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+async function draftWithOpenAI(key: string, prompt: string, attachments: Attachment[]) {
+  const base = OPENAI_BASE();
   let res: Response;
   try {
     res = await fetch(`${base}/responses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       signal: AbortSignal.timeout(240_000),
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-5',
@@ -105,7 +119,7 @@ async function draftWithOpenAI(prompt: string, attachments: Attachment[]) {
     status?: string; incomplete_details?: { reason?: string }; error?: { message?: string };
     output?: { type: string; content?: { type: string; text?: string; refusal?: string }[] }[];
   };
-  if (res.status === 401) throw new ContractError('A chave da API do ChatGPT (OPENAI_API_KEY) configurada no servidor é inválida.');
+  if (res.status === 401) throw new ContractError('A chave da API do ChatGPT é inválida. Atualize em Minha empresa → Inteligência artificial.');
   if (res.status === 429) throw new ContractError('Limite do ChatGPT atingido (muitas gerações seguidas ou sem créditos na conta OpenAI). Aguarde ou verifique os créditos em platform.openai.com.');
   if (!res.ok || !data) throw new ContractError(`O ChatGPT está indisponível agora (erro ${res.status}). Tente de novo em instantes.`);
   const parts = (data.output ?? []).filter((o) => o.type === 'message').flatMap((o) => o.content ?? []);
@@ -118,8 +132,9 @@ async function draftWithOpenAI(prompt: string, attachments: Attachment[]) {
 
 /** Redige o contrato com IA (ChatGPT se OPENAI_API_KEY existir, senao Claude). Pode levar de 30 segundos a 2 minutos. */
 export async function draftContract(t: Tenant, c: Client, sub: Subscription | null, extra: string, screens: string[], attachments: Attachment[] = []) {
-  if (process.env.OPENAI_API_KEY) return draftWithOpenAI(`Dados para o contrato:\n\n${describe(t, c, sub, extra, screens, attachments.length)}`, attachments);
-  if (!process.env.ANTHROPIC_API_KEY) throw new ContractError('A geração de contratos com IA ainda não foi configurada no servidor (falta a chave OPENAI_API_KEY).');
+  const oa = openaiKey(t);
+  if (oa) return draftWithOpenAI(oa, `Dados para o contrato:\n\n${describe(t, c, sub, extra, screens, attachments.length)}`, attachments);
+  if (!process.env.ANTHROPIC_API_KEY) throw new ContractError('A geração de contratos com IA ainda não foi configurada. Cadastre a chave da OpenAI em Minha empresa → Inteligência artificial.');
   const client = new Anthropic({ timeout: 240_000, maxRetries: 1 });
   try {
     // streaming evita estouro de tempo em respostas longas; finalMessage() junta o resultado

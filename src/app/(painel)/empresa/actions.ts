@@ -8,6 +8,7 @@ import { isUpload, removeFile, saveFile } from '@/lib/storage';
 import { encrypt, randomToken } from '@/lib/crypto';
 import { pixKeyProblem } from '@/lib/pix';
 import { asaas, BankError } from '@/lib/bank/asaas';
+import { checkOpenAiKey } from '@/lib/ai-contract';
 import type { ActionResult } from '@/components/ui';
 
 const COLOR = /^#[0-9a-f]{6}$/i;
@@ -83,4 +84,22 @@ export async function rotateWebhookToken(): Promise<ActionResult> {
   await db.tenant.update({ where: { id: user.tenantId }, data: { bankWebhookToken: randomToken(24) } });
   revalidatePath('/empresa');
   return { ok: true };
+}
+
+/** Chave da OpenAI (ChatGPT) para gerar contratos. Testada antes de gravar (criptografada). */
+export async function saveAi(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  if (fd.get('remove') === '1') {
+    await db.tenant.update({ where: { id: user.tenantId }, data: { aiApiKey: null } });
+    revalidatePath('/', 'layout');
+    return { ok: true, message: 'Chave removida.' };
+  }
+  const key = (str(fd, 'aiApiKey') ?? '').replace(/\s+/g, '');
+  if (!key) return { error: 'Cole a chave da API da OpenAI.' };
+  if (!key.startsWith('sk-')) return { error: 'A chave da OpenAI começa com sk-. Confira se copiou a chave certa.' };
+  const err = await checkOpenAiKey(key);
+  if (err) return { error: err };
+  await db.tenant.update({ where: { id: user.tenantId }, data: { aiApiKey: encrypt(key) } });
+  revalidatePath('/', 'layout');
+  return { ok: true, message: 'Chave salva e testada. A geração de contratos com IA já está liberada.' };
 }

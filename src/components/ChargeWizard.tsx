@@ -109,7 +109,7 @@ export function ChargeWizard({ clients, services, today, hasAi }: { clients: Opt
             </div>
           ) : (
             <form onSubmit={submitContract} className="space-y-4">
-              {!hasAi && <p className="rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">A geração com IA ainda não foi configurada no servidor. Você pode pular esta etapa.</p>}
+              {!hasAi && <p className="rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">A geração com IA ainda não foi configurada. <a href="/empresa#ia" className="font-semibold underline">Cadastre a chave da OpenAI</a> ou pule esta etapa.</p>}
               <p className="text-sm text-ink-500">A IA redige o contrato com os dados da sua empresa, do cliente e desta cobrança. Leva de 30 segundos a 2 minutos.</p>
               <Field label="Instruções adicionais (opcional)" hint="Ex.: 3 telas, vídeos de até 15 segundos, exclusividade no segmento"><textarea name="extra" rows={3} maxLength={2000} className="input" /></Field>
               <Field label="Anexos (opcional)" hint="PDF ou imagens, até 5 arquivos e 4 MB no total"><input type="file" name="attachments" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" className="input" /></Field>

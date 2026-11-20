@@ -47,6 +47,7 @@ model Tenant {
   bankEnv        String    @default("sandbox") // sandbox | producao
   bankApiKey     String?                       // criptografada
   bankWebhookToken String?
+  aiApiKey       String?   // chave da OpenAI (ChatGPT) para contratos com IA, criptografada
   invoiceSeq     Int       @default(0)
   invoiceNotes   String    @default("")
   users      User[]

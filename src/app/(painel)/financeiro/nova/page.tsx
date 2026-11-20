@@ -17,7 +17,7 @@ export default async function NovaCobrancaPage() {
   return (
     <>
       <PageHeader title="Nova cobrança" crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Nova cobrança' }]} />
-      <ChargeWizard clients={clients} services={services} today={localDate()} hasAi={aiConfigured()} />
+      <ChargeWizard clients={clients} services={services} today={localDate()} hasAi={aiConfigured(user.tenant)} />
     </>
   );
 }

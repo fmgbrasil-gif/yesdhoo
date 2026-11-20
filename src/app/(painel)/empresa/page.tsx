@@ -1,12 +1,12 @@
 import { headers } from 'next/headers';
-import { Building2, Landmark, QrCode } from 'lucide-react';
+import { Building2, Landmark, QrCode, Sparkles } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { fileUrl } from '@/lib/storage';
 import { decrypt, mask } from '@/lib/crypto';
 import { PageHeader } from '@/components/basic';
 import { ActionForm, Field } from '@/components/ui';
 import { CopyButton } from '@/components/CopyButton';
-import { rotateWebhookToken, saveBank, saveCompany, savePix } from './actions';
+import { rotateWebhookToken, saveAi, saveBank, saveCompany, savePix } from './actions';
 import { CnpjLookup } from '@/components/CnpjLookup';
 import { STATES } from '@/lib/constants';
 
@@ -76,6 +76,18 @@ export default async function EmpresaPage() {
             <Field label="Informações fiscais" hint="Aparece no rodapé, ao lado do total. Confirme o texto com seu contador."><textarea name="invoiceFiscal" rows={2} defaultValue={t.invoiceFiscal} className="input" /></Field>
             <Field label="Dados adicionais padrão" hint="Ex.: dados para transferência, contato do financeiro"><textarea name="invoiceNotes" rows={2} defaultValue={t.invoiceNotes} className="input" /></Field>
           </ActionForm>
+        </section>
+
+        <section id="ia" className="card scroll-mt-6 p-5 xl:col-span-2">
+          <h2 className="mb-1 flex items-center gap-2 font-bold"><Sparkles size={18} /> Inteligência artificial (contratos)</h2>
+          <p className="mb-4 max-w-3xl text-sm text-ink-500">Cole aqui a chave da API da OpenAI (ChatGPT) para gerar contratos automaticamente na Nova cobrança. Crie a chave em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="font-semibold text-brand-600 underline">platform.openai.com/api-keys</a> — a conta precisa ter créditos em <a href="https://platform.openai.com/settings/organization/billing" target="_blank" rel="noreferrer" className="font-semibold text-brand-600 underline">Billing</a>. A chave fica guardada criptografada e nunca é mostrada inteira.</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ActionForm action={saveAi} submit={t.aiApiKey ? 'Trocar chave' : 'Salvar chave'}>
+              <p className="text-sm">Situação: {t.aiApiKey ? <b className="text-emerald-600">ChatGPT conectado · chave {mask(decrypt(t.aiApiKey))}</b> : <b className="text-ink-500">nenhuma chave cadastrada</b>}</p>
+              <Field label="Chave da API da OpenAI" hint="Começa com sk-"><input name="aiApiKey" type="password" autoComplete="off" placeholder="sk-..." className="input" /></Field>
+            </ActionForm>
+            {t.aiApiKey && <ActionForm action={saveAi} submit="Remover chave" submitClass="btn-ghost !text-red-600"><input type="hidden" name="remove" value="1" /></ActionForm>}
+          </div>
         </section>
 
         <section className="card p-5 xl:col-span-2">
