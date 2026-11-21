@@ -36,7 +36,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
             <article key={m.id} className="card overflow-hidden">
               <div className="flex aspect-video flex-col items-center justify-center gap-2 p-5 text-center" style={{ background: cfg.bg ?? '#1b0c30', color: cfg.textColor ?? cfg.color ?? '#fff' }}>
                 <p className="text-lg font-black leading-tight" style={{ color: cfg.titleColor ?? cfg.color }}>{cfg.title ?? m.name}</p>
-                <p className="line-clamp-3 text-xs opacity-90">{cfg.text ?? MEDIA_TYPES[m.type]}</p>
+                <p className="line-clamp-3 text-xs opacity-90">{cfg.text ?? (m.type === 'rss' && cfg.source ? `Manchetes de ${cfg.source}` : MEDIA_TYPES[m.type])}</p>
               </div>
               <div className="flex items-center justify-between gap-2 p-3">
                 <div className="min-w-0"><p className="truncate text-sm font-semibold">{m.name}</p><p className="text-xs text-ink-400">{MEDIA_TYPES[m.type]} · {m.duration}s · em {on.length} tela(s)</p></div>
