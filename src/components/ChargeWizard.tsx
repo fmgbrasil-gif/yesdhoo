@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Check, Download, ExternalLink, FileSearch, FileSignature, Loader2, Mail, MessageCircle, Plus, Receipt, Send, SkipForward, UserPlus, Users } from 'lucide-react';
+import { ArrowLeft, Check, Download, ExternalLink, FileSearch, FileSignature, Loader2, Mail, MessageCircle, Plus, Receipt, Send, SkipForward, UserPlus, Users } from 'lucide-react';
 import { ChargeFields } from './ChargeForm';
 import { PixPanel } from './PixPanel';
 import { CnpjLookup } from './CnpjLookup';
@@ -22,15 +22,17 @@ type Contract = { contractId: string; title: string; body: string; fileName: str
 
 const STEPS = ['Cliente', 'Cobrança', 'Contrato', 'Fatura e Pix', 'Enviar'];
 
-function Stepper({ step }: { step: number }) {
+function Stepper({ step, max, onGo }: { step: number; max: number; onGo: (i: number) => void }) {
   return (
     <ol className="mb-6 flex flex-wrap items-center gap-2" aria-label="Etapas">
       {STEPS.map((s, i) => (
         <li key={s} className="flex items-center gap-2">
+          <button type="button" disabled={i > max || i === step} onClick={() => onGo(i)} title={i <= max && i !== step ? `Ir para ${s}` : undefined} className="flex items-center gap-2 rounded-full enabled:hover:opacity-80 disabled:cursor-default">
           <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-brand-400 text-on-brand' : 'bg-ink-100 text-ink-400 dark:bg-ink-800'}`} aria-current={i === step ? 'step' : undefined}>
-            {i < step ? <Check size={15} /> : i + 1}
+            {i < step || (i <= max && i !== step) ? <Check size={15} /> : i + 1}
           </span>
           <span className={`text-sm font-semibold ${i === step ? '' : 'text-ink-400'}`}>{s}</span>
+          </button>
           {i < STEPS.length - 1 && <span className="mx-1 h-px w-6 bg-ink-200 dark:bg-ink-700" />}
         </li>
       ))}
@@ -74,6 +76,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   clients: Opt[]; services: ServiceOpt[]; operations: OperationOpt[]; screens: ScreenOpt[]; today: string; hasAi: boolean;
 }) {
   const [step, setStep] = useState(0);
+  const [maxStep, setMaxStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // etapa 1
@@ -98,7 +101,8 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   useEffect(() => { if (invoiceId && !docs) wizardDocs(invoiceId).then((r) => (r.ok ? setDocs(r) : setError(r.error))); }, [invoiceId, docs]);
 
   const run = async <T,>(fn: () => Promise<T>) => { setBusy(true); setError(''); try { return await fn(); } finally { setBusy(false); } };
-  const go = (n: number) => { setError(''); setStep(n); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const go = (n: number) => { setError(''); setStep(n); setMaxStep((m) => Math.max(m, n)); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const back = (n: number) => <button type="button" className="btn-ghost" onClick={() => go(n)} disabled={busy}><ArrowLeft size={15} /> Voltar</button>;
 
   // ---- etapa 1: cliente
   const pickExisting = (e: React.FormEvent<HTMLFormElement>) => {
@@ -205,10 +209,18 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
 
   return (
     <div className="card p-5 sm:p-6">
-      <Stepper step={step} />
+      <Stepper step={step} max={maxStep} onGo={go} />
       {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-200" role="alert">{error}</p>}
 
-      {step === 0 && (
+      {step === 0 && charge && client && (
+        <div className="space-y-4">
+          <h2 className="flex items-center gap-2 text-lg font-bold"><Users size={18} /> Cliente</h2>
+          <p className="rounded-lg bg-ink-50 p-3 text-sm dark:bg-ink-900">Cliente: <b>{client.name}</b>. A cobrança já foi criada para este cliente, por isso ele não pode mais ser trocado aqui. Para cobrar outro cliente, comece uma <a href="/financeiro/nova" className="font-semibold text-brand-600 underline">nova cobrança</a>.</p>
+          <div className="flex justify-end"><button type="button" className="btn-primary" onClick={() => go(1)}>Avançar</button></div>
+        </div>
+      )}
+
+      {step === 0 && !charge && (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-bold"><Users size={18} /> Cliente</h2>
           <div className="flex gap-1 rounded-lg bg-ink-100 p-1 dark:bg-ink-900" role="radiogroup" aria-label="Cliente">
@@ -220,7 +232,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
           {clientMode === 'existente' ? (
             <form onSubmit={pickExisting} className="space-y-4">
               <Field label="Cliente ou parceiro">
-                <select name="clientId" required className="input" defaultValue="">
+                <select name="clientId" required className="input" defaultValue={client && clients.some((c) => c.id === client.id) ? client.id : ''}>
                   <option value="" disabled>Selecione...</option>
                   {['cliente', 'parceiro'].map((k) => (
                     <optgroup key={k} label={k === 'cliente' ? 'Clientes' : 'Parceiros'}>
@@ -253,7 +265,16 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
         </div>
       )}
 
-      {step === 1 && client && (
+      {step === 1 && client && charge && (
+        <div className="space-y-4">
+          <h2 className="flex items-center gap-2 text-lg font-bold"><Receipt size={18} /> Cobrança</h2>
+          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{charge.message}</p>
+          <p className="text-sm text-ink-500">A cobrança de <b>{client.name}</b> já foi criada. Para alterar valores ou vencimento, use o botão de editar a cobrança no Financeiro depois de concluir.</p>
+          <div className="flex justify-between gap-2">{back(0)}<button type="button" className="btn-primary" onClick={() => go(2)}>Avançar</button></div>
+        </div>
+      )}
+
+      {step === 1 && client && !charge && (
         <form onSubmit={submitCharge} className="space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-bold"><Receipt size={18} /> Cobrança</h2>
           <ChargeFields clients={clients} today={today} services={services} fixedClient={client} />
@@ -276,7 +297,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
                 <a href={`/contratos/${contract.contractId}`} target="_blank" rel="noreferrer" className="btn-ghost">Editar texto</a>
                 <button type="button" className="btn-ghost" onClick={() => download('contrato')}>{saved.contrato ? <Check size={15} className="text-emerald-600" /> : <Download size={15} />} Baixar PDF</button>
               </div>
-              <div className="flex justify-end"><button type="button" className="btn-primary" onClick={() => go(3)}>Avançar</button></div>
+              <div className="flex justify-between gap-2">{back(1)}<button type="button" className="btn-primary" onClick={() => go(3)}>Avançar</button></div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -297,6 +318,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
                 </form>
               )}
               <div className="flex flex-wrap justify-end gap-2">
+                <span className="mr-auto">{back(1)}</span>
                 <button type="button" className="btn-ghost" onClick={() => go(3)} disabled={busy}><SkipForward size={15} /> Pular contrato</button>
                 <button type="button" className="btn-primary" onClick={makeContract} disabled={busy || !opId}>{busy ? <Loader2 size={15} className="animate-spin" /> : <FileSignature size={15} />} Gerar contrato</button>
               </div>
@@ -320,7 +342,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
             </>
           )}
           {charge.subscriptionId && <p className="text-xs text-ink-400">As próximas faturas desta cobrança, com o Pix, são geradas automaticamente no último dia de cada mês e ficam no Financeiro para baixar e enviar.</p>}
-          <div className="flex justify-end"><button type="button" className="btn-primary" onClick={() => go(4)} disabled={!invoiceId}>Avançar</button></div>
+          <div className="flex justify-between gap-2">{back(2)}<button type="button" className="btn-primary" onClick={() => go(4)} disabled={!invoiceId}>Avançar</button></div>
         </div>
       )}
 
@@ -352,7 +374,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
               <iframe ref={pixFrame} src={docs.pixUrl} title="Documento do Pix" aria-hidden tabIndex={-1} style={{ position: 'absolute', left: '-10000px', top: 0, width: '900px', height: '1300px' }} />
             </>
           )}
-          <div className="flex justify-end gap-2"><Link href="/financeiro" className="btn-primary">Concluir</Link></div>
+          <div className="flex justify-between gap-2">{back(3)}<Link href="/financeiro" className="btn-primary">Concluir</Link></div>
         </div>
       )}
     </div>
