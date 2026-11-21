@@ -184,6 +184,16 @@ model Contract {
   operationId    String?
   operation      Operation?    @relation(fields: [operationId], references: [id], onDelete: SetNull)
   publicToken    String?       @unique // link publico para o cliente ver e baixar o contrato
+  signStatus     String        @default("pendente") // pendente | assinado | recusado (assinatura eletronica pelo link)
+  signedAt       DateTime?
+  signerName     String?
+  signerDoc      String?
+  signature      String?       // rubrica desenhada pelo cliente (PNG em data URL)
+  signerIp       String?
+  signerAgent    String?
+  bodyHash       String?       // SHA-256 do texto no momento da assinatura
+  refusedAt      DateTime?
+  refuseReason   String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }

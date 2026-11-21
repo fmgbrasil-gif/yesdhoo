@@ -26,14 +26,18 @@ export async function invoicePixData(id: string, origin: string): Promise<PixDat
   const name = inv.client.tradeName || inv.client.name;
   const payLink = `${link}/pagar`;
   // o link de pagamento vem primeiro: ele abre a pagina com o botao "Copiar codigo Pix"
+  // sem emojis: o link do WhatsApp (wa.me) estraga alguns deles em certos aparelhos
   const whatsappText = [
-    `Olá, ${name}! Segue o Pix da fatura nº ${inv.number} (${ref}) de ${user.tenant.tradeName || user.tenant.name}.`,
-    `Valor: *${fmtMoney(inv.amountCents)}* · Vencimento: ${fmtDate(inv.dueDate)}`,
+    `Olá, *${name}*!`,
+    `Segue o Pix da fatura nº ${inv.number} (${ref}) da *${user.tenant.tradeName || user.tenant.name}*.`,
     '',
-    '👉 Toque no link para *copiar o código Pix* com um clique:',
+    `*VALOR:* ${fmtMoney(inv.amountCents)}`,
+    `*VENCIMENTO:* ${fmtDate(inv.dueDate)}`,
+    '',
+    '*PAGAR COM PIX* (toque no link para copiar o código)',
     payLink,
     '',
-    'Se preferir, copie o código Pix Copia e Cola abaixo:',
+    '*PIX COPIA E COLA*',
     payload,
   ].join('\n');
   const digits = (inv.client.phone1 ?? '').replace(/\D/g, '');

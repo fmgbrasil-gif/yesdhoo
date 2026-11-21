@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
-import { contractToPdf, elementToPdf } from '@/lib/pdf-client';
+import { contractToPdf, elementToPdf, type PdfSignature } from '@/lib/pdf-client';
 
 /** Avisa a janela que abriu esta pagina num iframe (fluxo de nova cobranca) que o PDF foi salvo. */
 const notify = (ok: boolean, name: string) => { try { window.parent?.postMessage({ type: 'pdf-done', ok, name }, window.location.origin); } catch { /* sem janela pai */ } };
@@ -36,8 +36,8 @@ export function DownloadDocPdf({ fileName, auto = false, className = '' }: { fil
   );
 }
 
-export function DownloadContractPdf({ body, fileName, logo, auto = false }: { body: string; fileName: string; logo?: string | null; auto?: boolean }) {
-  const { busy, err, go } = usePdf(() => contractToPdf(body, fileName, logo), fileName, auto);
+export function DownloadContractPdf({ body, fileName, logo, auto = false, sig }: { body: string; fileName: string; logo?: string | null; auto?: boolean; sig?: PdfSignature | null }) {
+  const { busy, err, go } = usePdf(() => contractToPdf(body, fileName, logo, sig), fileName, auto);
   return (
     <span className="inline-flex flex-col items-end">
       <button type="button" onClick={go} disabled={busy} className="btn-ghost">{busy ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Baixar PDF</button>

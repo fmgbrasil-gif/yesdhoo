@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SIGN_LABEL } from '@/lib/contract-sign';
 import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2 } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
@@ -166,7 +167,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
           {contracts.length === 0 ? <Empty title="Nenhum contrato" text="Use “Contrato com IA” para redigir o primeiro." /> : (
             <ul className="divide-y divide-ink-100 dark:divide-ink-700">
               {contracts.map((c) => (
-                <li key={c.id}><Link href={`/contratos/${c.id}`} className="flex items-center justify-between gap-3 p-4 hover:bg-ink-50 dark:hover:bg-ink-700/40"><span><span className="block font-semibold">{c.title}</span><span className="text-xs text-ink-400">{c.client.name} · criado em {c.createdAt.toLocaleDateString('pt-BR')}</span></span><FileSignature size={18} className="text-ink-300" /></Link></li>
+                <li key={c.id}><Link href={`/contratos/${c.id}`} className="flex items-center justify-between gap-3 p-4 hover:bg-ink-50 dark:hover:bg-ink-700/40"><span><span className="block font-semibold">{c.title}</span><span className="text-xs text-ink-400">{c.client.name} · criado em {c.createdAt.toLocaleDateString('pt-BR')}</span></span><span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.signStatus === 'assinado' ? 'bg-emerald-100 text-emerald-700' : c.signStatus === 'recusado' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{SIGN_LABEL[c.signStatus] ?? c.signStatus}</span><FileSignature size={18} className="shrink-0 text-ink-300" /></Link></li>
               ))}
             </ul>
           )}

@@ -15,7 +15,7 @@ export function PixPanel({ invoiceId }: { invoiceId: string }) {
   const wa = `https://wa.me/${data.phone ?? ''}?text=${encodeURIComponent(data.whatsappText)}`;
   // so o codigo, numa mensagem separada: o cliente segura o dedo e copia exatamente o Pix
   const waCode = `https://wa.me/${data.phone ?? ''}?text=${encodeURIComponent(data.payload)}`;
-  const mail = `mailto:${data.email ?? ''}?subject=${encodeURIComponent(`${data.company} — fatura nº ${data.number} (${data.ref})`)}&body=${encodeURIComponent(data.whatsappText.replace(/\*/g, '').replace('👉 ', ''))}`;
+  const mail = `mailto:${data.email ?? ''}?subject=${encodeURIComponent(`${data.company} — fatura nº ${data.number} (${data.ref})`)}&body=${encodeURIComponent(data.whatsappText.replace(/\*/g, ''))}`;
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">

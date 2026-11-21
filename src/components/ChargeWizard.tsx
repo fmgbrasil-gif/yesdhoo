@@ -172,17 +172,20 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
 
   // ---- etapa 5: envio
   const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  // sem emojis: o link do WhatsApp (wa.me) estraga alguns deles em certos aparelhos
   const links = () => [
-    pick.contrato && contract && `📄 Contrato: ${origin}${contract.publicUrl}`,
-    pick.fatura && docs && `🧾 Fatura: ${origin}${docs.invoiceUrl}`,
-    pick.pix && docs && `💠 Pagar com Pix (toque para copiar o código): ${origin}${docs.payUrl}`,
+    pick.contrato && contract && `*CONTRATO* (leia e assine)\n${origin}${contract.publicUrl}`,
+    pick.fatura && docs && `*FATURA*\n${origin}${docs.invoiceUrl}`,
+    pick.pix && docs && `*PAGAR COM PIX* (toque no link para copiar o código)\n${origin}${docs.payUrl}`,
   ].filter(Boolean) as string[];
   const message = () => docs ? [
-    `Olá, ${docs.clientName}! Seguem os documentos da ${docs.company}:`,
+    `Olá, *${docs.clientName}*!`,
+    `Seguem os documentos da *${docs.company}*.`,
     '',
-    ...links(),
+    links().join('\n\n'),
     '',
-    `Valor: *${docs.amount}* · Vencimento: ${docs.due} (${docs.ref})`,
+    `*VALOR:* ${docs.amount}`,
+    `*VENCIMENTO:* ${docs.due} (${docs.ref})`,
   ].join('\n') : '';
   const download = async (kind: 'contrato' | 'pix' | 'fatura') => {
     try {

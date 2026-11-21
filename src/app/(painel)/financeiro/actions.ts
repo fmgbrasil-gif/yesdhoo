@@ -13,6 +13,7 @@ import { chargeFromForm, contractFromForm, readItems, rememberServices } from '@
 import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
 import { basicContract } from '@/lib/contract-template';
+import { randomToken } from '@/lib/crypto';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -51,6 +52,7 @@ export async function saveContract(_: ActionResult, fd: FormData): Promise<Actio
   const user = await requireAdmin();
   const c = await db.contract.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });
   if (!c) return { error: 'Contrato não encontrado.' };
+  if (c.signStatus === 'assinado') return { error: 'Contrato já assinado pelo cliente: o texto não pode mais ser alterado.' };
   const body = String(fd.get('body') ?? '').trim();
   if (!body) return { error: 'O contrato não pode ficar vazio.' };
   await db.contract.update({ where: { id: c.id }, data: { body: body.slice(0, 100_000), title: str(fd, 'title') ?? c.title } });
@@ -190,6 +192,7 @@ export async function refreshContract(_: ActionResult, fd: FormData): Promise<Ac
   const user = await requireAdmin();
   const c = await db.contract.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId }, include: { client: true, subscription: true, operation: { include: { screens: { orderBy: { name: 'asc' } } } } } });
   if (!c || !c.operation) return { error: 'Este contrato não é de uma operação; não dá para refazer pelo modelo.' };
+  if (c.signStatus === 'assinado') return { error: 'Contrato já assinado pelo cliente: o texto não pode mais ser alterado.' };
   const sub = c.subscription;
   const inv = sub ? null : await db.invoice.findFirst({ where: { clientId: c.clientId, tenantId: user.tenantId, status: { not: 'cancelada' } }, orderBy: { createdAt: 'desc' } });
   if (!sub && !inv) return { error: 'Não encontrei a cobrança deste contrato.' };
@@ -200,4 +203,23 @@ export async function refreshContract(_: ActionResult, fd: FormData): Promise<Ac
   await db.contract.update({ where: { id: c.id }, data: { body } });
   revalidatePath(`/contratos/${c.id}`);
   return { ok: true, message: 'Contrato refeito com o modelo atual.' };
+}
+
+/** Cria o link para o cliente ler e assinar (contratos antigos, gerados antes da assinatura eletronica). */
+export async function shareContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const c = await db.contract.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });
+  if (!c) return { error: 'Contrato não encontrado.' };
+  if (!c.publicToken) await db.contract.update({ where: { id: c.id }, data: { publicToken: randomToken(18) } });
+  revalidatePath(`/contratos/${c.id}`);
+  return { ok: true };
+}
+
+/** Recusado pelo cliente: volta para "aguardando assinatura" depois de ajustar o texto. */
+export async function reopenContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const r = await db.contract.updateMany({ where: { id: String(fd.get('id')), tenantId: user.tenantId, signStatus: 'recusado' }, data: { signStatus: 'pendente', refusedAt: null, refuseReason: null } });
+  if (!r.count) return { error: 'Só contratos recusados podem ser reenviados.' };
+  revalidatePath('/', 'layout');
+  return { ok: true, message: 'Contrato liberado para assinatura de novo.' };
 }
