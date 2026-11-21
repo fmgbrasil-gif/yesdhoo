@@ -73,8 +73,8 @@ export type Attachment = { name: string; mime: string; data: string };
 /** Ha alguma IA configurada no servidor? (OpenAI/ChatGPT tem prioridade; Claude como alternativa) */
 export const aiConfigured = (t?: Pick<Tenant, 'aiApiKey'>) => !!(openaiKey(t) || process.env.ANTHROPIC_API_KEY);
 /** Chave da OpenAI: a cadastrada em Minha empresa; senao a do servidor (OPENAI_API_KEY). */
-const openaiKey = (t?: Pick<Tenant, 'aiApiKey'>) => (t && decrypt(t.aiApiKey)) || process.env.OPENAI_API_KEY || null;
-const OPENAI_BASE = () => (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+export const openaiKey = (t?: Pick<Tenant, 'aiApiKey'>) => (t && decrypt(t.aiApiKey)) || process.env.OPENAI_API_KEY || null;
+export const OPENAI_BASE = () => (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 
 /** Testa a chave da OpenAI antes de gravar. Devolve uma mensagem de erro ou null. */
 export async function checkOpenAiKey(key: string): Promise<string | null> {

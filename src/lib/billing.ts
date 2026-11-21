@@ -43,8 +43,11 @@ export const addMonths = (ym: string, n: number) => {
 };
 export const dueFor = (ym: string, dueDay: number) => `${ym}-${String(Math.min(28, Math.max(1, dueDay))).padStart(2, '0')}`;
 
-/** Recorrente: gera ate o mes atual e adianta o mes seguinte quando o vencimento dele estiver a ate 15 dias. */
-const LEAD_DAYS = 15;
+/** Ultimo dia do mes (YYYY-MM-DD) da data informada. */
+export const lastDayOfMonth = (iso: string) => {
+  const d = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)), 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 /** Meses que ja deveriam ter fatura para esta cobranca. */
 export function monthsDue(sub: Pick<Subscription, 'mode' | 'startMonth' | 'months' | 'dueDay'>, today = localDate()) {
@@ -52,8 +55,9 @@ export function monthsDue(sub: Pick<Subscription, 'mode' | 'startMonth' | 'month
   const current = today.slice(0, 7);
   const out: string[] = [];
   for (let m = sub.startMonth; m <= current; m = addMonths(m, 1)) out.push(m);
+  // recorrente: a fatura do mes seguinte e gerada no ultimo dia de cada mes
   const next = addMonths(current, 1);
-  if (next >= sub.startMonth && !out.includes(next) && (Date.parse(dueFor(next, sub.dueDay)) - Date.parse(today)) / 86400_000 <= LEAD_DAYS) out.push(next);
+  if (next >= sub.startMonth && !out.includes(next) && today >= lastDayOfMonth(today)) out.push(next);
   return out;
 }
 
@@ -81,6 +85,27 @@ export async function generateForSubscription(sub: Subscription, today = localDa
   return created;
 }
 
+/**
+ * Gera ja a primeira fatura que falta desta cobranca (botao "Gerar fatura" da Nova cobranca),
+ * mesmo que o mes ainda nao tenha chegado. Devolve a fatura (nova ou a que ja existia).
+ */
+export async function generateFirstPending(sub: Subscription) {
+  const existing = await db.invoice.findFirst({ where: { subscriptionId: sub.id, status: { not: 'cancelada' } }, orderBy: { dueDate: 'asc' } });
+  if (existing) return existing;
+  const items = parseJson<InvoiceItem[]>(sub.items, []);
+  const ym = sub.startMonth;
+  const tag = sub.mode === 'periodo' ? ` — parcela 1/${sub.months} (${competenceLabel(ym)})` : ` — ${competenceLabel(ym)}`;
+  try {
+    return await createInvoice(sub.tenantId, {
+      clientId: sub.clientId, subscriptionId: sub.id, competence: ym, installment: sub.mode === 'periodo' ? 1 : undefined,
+      dueDate: dueFor(ym, sub.dueDay), notes: sub.notes, items: items.map((it) => ({ ...it, description: it.description + tag })),
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code !== 'P2002') throw e;
+    return db.invoice.findFirstOrThrow({ where: { subscriptionId: sub.id, competence: ym } });
+  }
+}
+
 /** Roda todas as cobrancas ativas (de uma empresa ou de todas). Chamado pela rotina diaria e ao abrir o Financeiro. */
 export async function runRecurring(tenantId?: string) {
   const subs = await db.subscription.findMany({ where: { status: 'ativa', ...(tenantId ? { tenantId } : {}) } });
@@ -89,11 +114,11 @@ export async function runRecurring(tenantId?: string) {
   return { subscriptions: subs.length, created };
 }
 
-export async function createSubscription(tenantId: string, data: { clientId: string; mode: 'periodo' | 'recorrente'; items: InvoiceItem[]; dueDay: number; startMonth: string; months?: number; notes?: string }) {
+export async function createSubscription(tenantId: string, data: { clientId: string; mode: 'periodo' | 'recorrente'; items: InvoiceItem[]; dueDay: number; startMonth: string; months?: number; notes?: string; operationId?: string | null }) {
   const sub = await db.subscription.create({
     data: {
       tenantId, clientId: data.clientId, mode: data.mode, items: JSON.stringify(data.items), amountCents: itemsTotal(data.items), dueDay: data.dueDay,
-      startMonth: data.startMonth, months: data.mode === 'periodo' ? data.months : null, notes: data.notes ?? '',
+      startMonth: data.startMonth, months: data.mode === 'periodo' ? data.months : null, notes: data.notes ?? '', operationId: data.operationId ?? null,
     },
   });
   await generateForSubscription(sub);

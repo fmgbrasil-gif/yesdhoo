@@ -12,7 +12,7 @@ const MODES = [
 ] as const;
 
 /** Campos da nova cobranca; o tipo escolhido mostra os campos de data certos. */
-export function ChargeFields({ clients, today, services }: { clients: Opt[]; today: string; services: ServiceOpt[] }) {
+export function ChargeFields({ clients, today, services, fixedClient }: { clients: Opt[]; today: string; services: ServiceOpt[]; fixedClient?: { id: string; name: string } }) {
   const [mode, setMode] = useState<(typeof MODES)[number]['key']>('recorrente');
   const month = today.slice(0, 7);
   return (
@@ -29,7 +29,9 @@ export function ChargeFields({ clients, today, services }: { clients: Opt[]; tod
         <p className="mt-1 text-xs text-ink-400">{MODES.find((m) => m.key === mode)!.hint}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Cliente ou parceiro" className="sm:col-span-3">
+        {fixedClient ? (
+          <div className="sm:col-span-3"><input type="hidden" name="clientId" value={fixedClient.id} /><span className="label">Cliente</span><p className="font-semibold">{fixedClient.name}</p></div>
+        ) : <Field label="Cliente ou parceiro" className="sm:col-span-3">
           <select name="clientId" required className="input" defaultValue="">
             <option value="" disabled>Selecione...</option>
             {['cliente', 'parceiro'].map((k) => (
@@ -38,7 +40,7 @@ export function ChargeFields({ clients, today, services }: { clients: Opt[]; tod
               </optgroup>
             ))}
           </select>
-        </Field>
+        </Field>}
         {mode === 'avulsa' ? (
           <Field label="Vencimento"><input type="date" name="dueDate" required className="input" defaultValue={today} /></Field>
         ) : (

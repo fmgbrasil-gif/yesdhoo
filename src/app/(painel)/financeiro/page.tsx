@@ -157,7 +157,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
               </table>
             </div>
           )}
-          <p className="border-t border-ink-100 p-3 text-xs text-ink-400 dark:border-ink-700">As cobranças recorrentes geram a fatura de cada mês automaticamente, até 15 dias antes do vencimento. Por período, todas as parcelas são geradas na criação.</p>
+          <p className="border-t border-ink-100 p-3 text-xs text-ink-400 dark:border-ink-700">As cobranças recorrentes geram a fatura do mês seguinte automaticamente no último dia de cada mês. Por período, todas as parcelas são geradas na criação.</p>
         </div>
       )}
 

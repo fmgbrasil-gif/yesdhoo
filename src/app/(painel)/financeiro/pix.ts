@@ -9,7 +9,7 @@ import { pixFileName } from '@/lib/doc-names';
 
 export type PixData =
   | { ok: false; error: string }
-  | { ok: true; payload: string; qr: string; amount: string; due: string; ref: string; clientName: string; phone: string | null; link: string; payLink: string; pixLink: string; pixFile: string; whatsappText: string };
+  | { ok: true; payload: string; qr: string; amount: string; due: string; ref: string; clientName: string; phone: string | null; email: string | null; company: string; number: number; link: string; payLink: string; pixLink: string; pixFile: string; whatsappText: string };
 
 /** Pix Copia e Cola de uma fatura em aberto, com QR Code e a mensagem pronta para o WhatsApp do cliente. */
 export async function invoicePixData(id: string, origin: string): Promise<PixData> {
@@ -38,7 +38,7 @@ export async function invoicePixData(id: string, origin: string): Promise<PixDat
   ].join('\n');
   const digits = (inv.client.phone1 ?? '').replace(/\D/g, '');
   return {
-    ok: true, payload, qr, amount: fmtMoney(inv.amountCents), due: fmtDate(inv.dueDate), ref, clientName: inv.client.name,
+    ok: true, payload, qr, amount: fmtMoney(inv.amountCents), due: fmtDate(inv.dueDate), ref, clientName: inv.client.name, email: inv.client.email, company: user.tenant.tradeName || user.tenant.name, number: inv.number,
     phone: digits.length >= 10 ? (digits.startsWith('55') && digits.length >= 12 ? digits : `55${digits}`) : null,
     link, payLink, pixLink: `${link}/pix`, pixFile: pixFileName(inv, inv.client), whatsappText,
   };

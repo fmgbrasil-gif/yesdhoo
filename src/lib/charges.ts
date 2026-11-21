@@ -42,6 +42,17 @@ export async function rememberServices(tenantId: string, items: InvoiceItem[]) {
   }
 }
 
+/** Anexos do formulario (campo "attachments"): PDF ou imagens, ate 5 arquivos e 4 MB no total (limite de envio do servidor). */
+export async function readAttachments(fd: FormData, field = 'attachments'): Promise<Attachment[] | string> {
+  const files = fd.getAll(field).filter(isUpload);
+  const ALLOWED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+  if (files.length > 5) return 'Anexe no máximo 5 arquivos.';
+  if (files.reduce((a, f) => a + f.size, 0) > 4 * 1024 * 1024) return 'Os arquivos passam de 4 MB. Envie arquivos menores ou menos arquivos.';
+  const bad = files.find((f) => !ALLOWED.includes(f.type));
+  if (bad) return `“${bad.name}” não é PDF nem imagem (PNG, JPG, WEBP ou GIF).`;
+  return Promise.all(files.map(async (f) => ({ name: f.name, mime: f.type, data: Buffer.from(await f.arrayBuffer()).toString('base64') })));
+}
+
 type ChargeResult = { error: string } | { message: string; invoiceId: string | null; subscriptionId: string | null; clientId: string };
 
 /** Valida o formulario e cria a cobranca. Devolve a primeira fatura gerada (para o fluxo de envio). */
@@ -88,14 +99,9 @@ export async function contractFromForm(user: SessionUser, fd: FormData): Promise
     where: { tenantId: user.tenantId, OR: [{ clientId: client.id }, { items: { some: { media: { clientId: client.id } } } }] },
     select: { name: true, city: true, state: true }, orderBy: { name: 'asc' }, take: 30,
   })).map((s) => [s.name, s.city && `${s.city}${s.state ? '/' + s.state : ''}`].filter(Boolean).join(' — '));
-  // anexos opcionais: PDF ou imagens, ate 5 arquivos e 4 MB no total (limite de envio do servidor)
-  const files = fd.getAll('attachments').filter(isUpload);
-  const ALLOWED = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-  if (files.length > 5) return { error: 'Anexe no máximo 5 arquivos.' };
-  if (files.reduce((a, f) => a + f.size, 0) > 4 * 1024 * 1024) return { error: 'Os anexos passam de 4 MB. Envie arquivos menores ou menos arquivos.' };
-  const bad = files.find((f) => !ALLOWED.includes(f.type));
-  if (bad) return { error: `“${bad.name}” não é PDF nem imagem (PNG, JPG, WEBP ou GIF).` };
-  const attachments: Attachment[] = await Promise.all(files.map(async (f) => ({ name: f.name, mime: f.type, data: Buffer.from(await f.arrayBuffer()).toString('base64') })));
+  const att = await readAttachments(fd);
+  if (typeof att === 'string') return { error: att };
+  const attachments = att;
   let body: string;
   try {
     body = await draftContract(user.tenant, client, sub, String(fd.get('extra') ?? ''), screens, attachments);

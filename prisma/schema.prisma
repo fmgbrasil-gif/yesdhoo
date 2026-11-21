@@ -55,6 +55,7 @@ model Tenant {
   subscriptions Subscription[]
   contracts  Contract[]
   services   Service[]
+  operations Operation[]
   screens    Screen[]
   clients    Client[]
   medias     Media[]
@@ -160,6 +161,8 @@ model Subscription {
   cancelledAt  DateTime?
   cancelReason String?
   notes        String    @default("")
+  operationId  String?
+  operation    Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   invoices     Invoice[]
@@ -178,8 +181,25 @@ model Contract {
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
   title          String
   body           String
+  operationId    String?
+  operation      Operation?    @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  publicToken    String?       @unique // link publico para o cliente ver e baixar o contrato
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+}
+
+// Operacao: conjunto de pontos (telas) que um contrato contempla, ex.: "Rede Delta"
+model Operation {
+  id            String         @id @default(uuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  description   String         @default("")
+  screens       Screen[]
+  contracts     Contract[]
+  subscriptions Subscription[]
+  createdAt     DateTime       @default(now())
+  @@index([tenantId])
 }
 
 // Catalogo de servicos prestados (atalho para preencher os itens das cobrancas).
@@ -281,6 +301,7 @@ model Screen {
   stats           PlayStat[]
   uptime          ScreenUptime[]
   users           UserScreen[]
+  operations      Operation[]
 }
 
 // Conteudo reproduzivel. tenantId nulo = biblioteca global (conteudos dinamicos).
