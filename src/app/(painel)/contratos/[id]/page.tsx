@@ -1,11 +1,11 @@
 import { notFound } from 'next/navigation';
-import { Trash2 } from 'lucide-react';
+import { RefreshCw, Trash2 } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { fileUrl } from '@/lib/storage';
 import { PageHeader } from '@/components/basic';
 import { ActionForm, Confirm, Field, Tabs } from '@/components/ui';
-import { deleteContract, saveContract } from '../../financeiro/actions';
+import { deleteContract, refreshContract, saveContract } from '../../financeiro/actions';
 import { DownloadContractPdf } from '@/components/PdfButtons';
 import { contractFileName } from '@/lib/doc-names';
 
@@ -35,10 +35,11 @@ export default async function ContratoPage({ params, searchParams }: { params: P
     <>
       <PageHeader title={c.title} crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Contratos', href: '/financeiro?aba=contratos' }, { label: c.client.name }]}>
         <DownloadContractPdf body={c.body} fileName={contractFileName(c.client)} logo={fileUrl(user.tenant.logo)} auto={auto} />
+        {c.operationId && <Confirm trigger={<><RefreshCw size={15} /> Refazer pelo modelo</>} triggerClass="btn-ghost" titleAttr="Refazer pelo modelo" title="Refazer o contrato pelo modelo padrão?" text="O texto é refeito com o modelo atual, os pontos da operação e os dados atualizados do cliente e da empresa. Edições feitas à mão neste contrato serão perdidas." confirmLabel="Sim, refazer" action={refreshContract} fields={{ id: c.id }} />}
         <Confirm trigger={<><Trash2 size={15} /> Excluir</>} triggerClass="btn-ghost !text-red-600" titleAttr="Excluir contrato" title="Excluir este contrato?" text="O texto do contrato será apagado. As cobranças do cliente não mudam." confirmLabel="Sim, excluir" action={deleteContract} fields={{ id: c.id }} />
       </PageHeader>
       <p className="mb-4 max-w-3xl rounded-lg bg-brand-50 p-3 text-sm text-ink-700 print:hidden dark:bg-ink-800 dark:text-ink-200">
-        Texto redigido por IA a partir do cadastro e das condições da cobrança. <b>Revise com atenção</b>, preencha os campos marcados com [PREENCHER] e, se possível, peça a validação de um advogado antes de assinar. Use “Baixar PDF” para salvar o arquivo.
+        {c.operationId ? 'Contrato no modelo padrão, com os pontos da operação.' : 'Texto redigido por IA a partir do cadastro e das condições da cobrança.'} <b>Revise com atenção</b>, preencha os campos marcados com [PREENCHER] e, se possível, peça a validação de um advogado antes de assinar. Use “Baixar PDF” para salvar o arquivo.
       </p>
       <Tabs tabs={[
         { label: 'Visualizar', content: (

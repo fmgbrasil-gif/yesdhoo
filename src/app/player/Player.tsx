@@ -76,7 +76,7 @@ function Clock({ tz, style }: { tz: string; style?: CSSProperties }) {
 const WEATHER: Record<number, string> = { 0: 'Céu limpo', 1: 'Poucas nuvens', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina', 51: 'Garoa', 53: 'Garoa', 55: 'Garoa', 61: 'Chuva fraca', 63: 'Chuva', 65: 'Chuva forte', 80: 'Pancadas de chuva', 81: 'Pancadas de chuva', 82: 'Temporal', 95: 'Trovoadas', 96: 'Trovoadas', 99: 'Trovoadas' };
 
 /** Slides montados pelo player a partir de dados (aviso, noticias, hora, dolar, clima). */
-function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; api: (p: string) => Promise<Response>; skip: () => void; n: number }) {
+export function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; api: (p: string) => Promise<Response>; skip: () => void; n: number }) {
   const cfg = media.config as Record<string, string | boolean | undefined>;
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const needsData = ['rss', 'dolar', 'clima'].includes(media.type);

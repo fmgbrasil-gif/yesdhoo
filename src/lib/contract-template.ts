@@ -26,13 +26,17 @@ function party(p: Party) {
  */
 export function basicContract(t: Tenant, c: Client, charge: ContractCharge, op: ContractOperation | null, today: string) {
   const contratada = t.tradeName || t.name;
-  const points = op?.screens.length
-    ? op.screens.map((s) => `   - ${s.name}${[addressLine(s), s.city && `${s.city}${s.state ? '/' + s.state : ''}`].filter(Boolean).length ? ` — ${[addressLine(s), s.city && `${s.city}${s.state ? '/' + s.state : ''}`].filter(Boolean).join(', ')}` : ''}`).join('\n')
-    : '   - [PREENCHER: pontos de exibição]';
+  const place = (x: ContractOperation['screens'][number]) => [addressLine(x), x.city && `${x.city}${x.state ? '/' + x.state : ''}`].filter(Boolean).join(', ');
+  const screens = op?.screens ?? [];
+  const points = screens.length
+    ? screens.map((x, i) => `${i + 1}. ${x.name}${place(x) ? ` — ${place(x)}` : ''}`).join('\n')
+    : '1. [PREENCHER: pontos de exibição]';
+  const qty = screens.length ? `${screens.length} (${extenso(screens.length, { mode: 'number' })}) ponto${screens.length === 1 ? '' : 's'}` : 'pontos';
   const start = charge.mode === 'avulsa' ? today : `${charge.startMonth ?? today.slice(0, 7)}-01`;
   const value = `${fmtMoney(charge.amountCents)} (${moneyInWords(charge.amountCents).toLowerCase()})`;
   const clauses: [string, string][] = [
-    ['DO OBJETO', `O presente contrato tem por objeto a veiculação, pela CONTRATADA, de conteúdos publicitários do CONTRATANTE (vídeos e imagens) nas telas digitais de mídia indoor da operação "${op?.name ?? '[PREENCHER]'}", instaladas nos seguintes pontos:\n${points}\n\nParágrafo único. Os conteúdos serão exibidos em ciclo, junto com os de outros anunciantes, durante o horário de funcionamento de cada ponto.`],
+    ['DO OBJETO', `O presente contrato tem por objeto a veiculação, pela CONTRATADA, de conteúdos publicitários do CONTRATANTE (vídeos e imagens) nas telas digitais de mídia indoor da operação "${op?.name ?? '[PREENCHER]'}", nos pontos relacionados na Cláusula Segunda.`],
+    ['DOS PONTOS DE VEICULAÇÃO', `As propagandas do CONTRATANTE serão veiculadas nos seguintes ${qty}:\n${points}\n\nParágrafo único. Os conteúdos serão exibidos em ciclo, junto com os de outros anunciantes, durante o horário de funcionamento de cada ponto. A inclusão ou troca de pontos depende de acordo entre as partes.`],
     ['DO VALOR E DA FORMA DE PAGAMENTO', charge.mode === 'avulsa'
       ? `Pela veiculação, o CONTRATANTE pagará à CONTRATADA o valor de ${value}, com vencimento em ${fmtDate(charge.dueDate ?? today)}, por Pix ou boleto, conforme a fatura enviada pela CONTRATADA.`
       : `Pela veiculação, o CONTRATANTE pagará à CONTRATADA o valor mensal de ${value}, com vencimento todo dia ${charge.dueDay ?? 10} de cada mês, a partir de ${competenceLabel(start.slice(0, 7))}, por Pix ou boleto, conforme a fatura enviada mensalmente pela CONTRATADA.\n\nParágrafo único. O atraso no pagamento permite à CONTRATADA suspender a veiculação até a regularização.`],

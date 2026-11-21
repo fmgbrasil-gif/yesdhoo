@@ -8,6 +8,8 @@ import { LIBRARY_SECTIONS, MEDIA_TYPES } from '@/lib/constants';
 import { PageHeader } from '@/components/basic';
 import { ActionForm, Modal, MultiPicker } from '@/components/ui';
 import { includeLibrary } from '../midias/actions';
+import { ContentPreview } from '@/components/ContentPreview';
+import { mediaForPlayer } from '@/lib/playables';
 
 export default async function BibliotecaPage({ searchParams }: { searchParams: Promise<{ secao?: string }> }) {
   const sp = await searchParams;
@@ -38,6 +40,8 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
               </div>
               <div className="flex items-center justify-between gap-2 p-3">
                 <div className="min-w-0"><p className="truncate text-sm font-semibold">{m.name}</p><p className="text-xs text-ink-400">{MEDIA_TYPES[m.type]} · {m.duration}s · em {on.length} tela(s)</p></div>
+                <div className="flex shrink-0 gap-2">
+                <ContentPreview h={mediaForPlayer(m, 'H')} v={mediaForPlayer(m, 'V')} />
                 <Modal trigger={<><MonitorUp size={15} /> Telas</>} triggerClass="btn-ghost shrink-0" title={`Incluir “${m.name}” nas telas`}>
                   <ActionForm action={includeLibrary} submit="Aplicar">
                     <input type="hidden" name="id" value={m.id} />
@@ -45,6 +49,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
                     <MultiPicker name="screens" options={data.screens} defaultValue={on} placeholder="Busque pelo nome da tela..." />
                   </ActionForm>
                 </Modal>
+                </div>
               </div>
             </article>
           );

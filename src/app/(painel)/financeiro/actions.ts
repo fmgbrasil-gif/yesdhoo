@@ -12,6 +12,7 @@ import { localDate } from '@/lib/util';
 import { chargeFromForm, contractFromForm, readItems, rememberServices } from '@/lib/charges';
 import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
+import { basicContract } from '@/lib/contract-template';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -182,4 +183,21 @@ export async function updateCharge(_: ActionResult, fd: FormData): Promise<Actio
   void updated;
   revalidatePath('/', 'layout');
   return { ok: true, message: changed ? `Cobrança atualizada e ${changed} fatura(s) em aberto ajustadas.` : 'Cobrança atualizada. Vale para as próximas faturas.' };
+}
+
+/** Refaz o texto de um contrato da operacao com o modelo padrao atual (pontos e dados atualizados). */
+export async function refreshContract(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const c = await db.contract.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId }, include: { client: true, subscription: true, operation: { include: { screens: { orderBy: { name: 'asc' } } } } } });
+  if (!c || !c.operation) return { error: 'Este contrato não é de uma operação; não dá para refazer pelo modelo.' };
+  const sub = c.subscription;
+  const inv = sub ? null : await db.invoice.findFirst({ where: { clientId: c.clientId, tenantId: user.tenantId, status: { not: 'cancelada' } }, orderBy: { createdAt: 'desc' } });
+  if (!sub && !inv) return { error: 'Não encontrei a cobrança deste contrato.' };
+  const charge = sub
+    ? { mode: sub.mode, amountCents: sub.amountCents, dueDay: sub.dueDay, startMonth: sub.startMonth, months: sub.months }
+    : { mode: 'avulsa', amountCents: inv!.amountCents, dueDate: inv!.dueDate };
+  const body = basicContract(user.tenant, c.client, charge, c.operation, c.createdAt.toISOString().slice(0, 10));
+  await db.contract.update({ where: { id: c.id }, data: { body } });
+  revalidatePath(`/contratos/${c.id}`);
+  return { ok: true, message: 'Contrato refeito com o modelo atual.' };
 }
