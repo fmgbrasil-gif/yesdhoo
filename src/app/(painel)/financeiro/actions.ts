@@ -36,9 +36,9 @@ export async function cancelCharge(_: ActionResult, fd: FormData): Promise<Actio
   const user = await requireAdmin();
   const sub = await db.subscription.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId, status: 'ativa' } });
   if (!sub) return { error: 'Cobrança não encontrada ou já cancelada.' };
-  const n = await cancelSubscription(sub, { reason: str(fd, 'reason'), cancelOpen: fd.get('cancelOpen') === 'on' });
+  const n = await cancelSubscription(sub, { reason: str(fd, 'reason') }); // cancela todas as faturas futuras em aberto
   revalidatePath('/', 'layout');
-  return { ok: true, message: n ? `Cobrança cancelada e ${n} fatura(s) futura(s) canceladas.` : 'Cobrança cancelada. Nenhuma fatura nova será gerada.' };
+  return { ok: true, message: n ? `Recorrência cancelada e ${n} fatura(s) futura(s) canceladas.` : 'Recorrência cancelada. Nenhuma fatura nova será gerada.' };
 }
 
 /** Gera o contrato com IA e abre a pagina dele para revisar. */

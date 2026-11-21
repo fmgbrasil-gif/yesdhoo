@@ -1,19 +1,18 @@
 import Link from 'next/link';
 import { SIGN_LABEL } from '@/lib/contract-sign';
-import { suggestedAccount } from '@/lib/cash';
-import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2, RotateCcw, ChevronLeft, ChevronRight, CalendarRange, Zap } from 'lucide-react';
+import { Ban, Pencil, FileSignature, FileText, Repeat, Search, ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { localDate } from '@/lib/util';
 import { fmtDate, fmtMoney } from '@/lib/money';
-import { addMonths, bankOf, competenceLabel, invoiceItems, invoiceLink, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
+import { addMonths, bankOf, competenceLabel, invoiceItems, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
-import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
-import { ChargeFields } from '@/components/ChargeForm';
-import { boletoInvoice, cancelCharge, cancelInvoice, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice, updateCharge, updateInvoice, reactivateInvoice } from './actions';
+import { ActionForm, Field, Modal } from '@/components/ui';
+import { cancelCharge, updateCharge } from './actions';
 import { InvoiceItems } from '@/components/InvoiceItems';
 import { MoneyInput } from '@/components/MoneyInput';
-import { PixButton } from '@/components/PixPanel';
+import { InvoiceActions } from '@/components/InvoiceActions';
+import { FinanceButtons } from '@/components/FinanceButtons';
 
 // a geracao de contrato com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
@@ -60,7 +59,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   Object.assign(where, periodWhere(where as { dueDate?: { gte?: string; lt?: string } }));
   const sum = (w: object) => db.invoice.aggregate({ where: { tenantId: tid, ...w }, _sum: { amountCents: true }, _count: true });
   const [rows, total, open, overdue, paidMonth, clients] = await Promise.all([
-    db.invoice.findMany({ where, skip, take, orderBy: [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } }, operation: { select: { name: true, accountId: true } } } }),
+    db.invoice.findMany({ where, skip, take, orderBy: [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } }, operation: { select: { name: true, accountId: true } }, subscription: { select: { status: true } } } }),
     db.invoice.count({ where }),
     sum(periodWhere({ status: 'aberta', dueDate: { gte: today } } as never)),
     sum(periodWhere({ status: 'aberta', dueDate: { lt: today } } as never)),
@@ -85,40 +84,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title="Financeiro" crumbs={[{ label: 'Financeiro' }, { label: 'Contas a receber' }]}>
-        <Link href="/empresa#cobranca" className="btn-ghost"><Settings size={15} /> Pix e banco</Link>
-        <Modal trigger={<><FileSignature size={16} /> Contrato com IA</>} triggerClass="btn-ghost" title="Gerar contrato com IA" wide>
-          <ActionForm action={generateContract} submit="Gerar contrato">
-            <p className="text-sm text-ink-500">A IA redige um contrato de prestação de serviços com os dados da sua empresa e do cliente, as condições da cobrança e os anexos que você enviar. Leva de 30 segundos a 2 minutos. Você revisa e edita antes de usar.</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Cliente ou parceiro">
-                <select name="clientId" required className="input" defaultValue="">
-                  <option value="" disabled>Selecione...</option>
-                  {clients.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.kind === 'parceiro' ? 'parceiro' : 'cliente'})</option>)}
-                </select>
-              </Field>
-              <Field label="Condições comerciais" hint="Valor, prazo e vencimento vêm desta cobrança">
-                <select name="subscriptionId" className="input" defaultValue="">
-                  <option value="">Sem cobrança (deixar valores em branco)</option>
-                  {activeSubs.map((s) => <option key={s.id} value={s.id}>{s.client.name} — {SUB_MODE(s)} · {fmtMoney(s.amountCents)}/mês</option>)}
-                </select>
-              </Field>
-            </div>
-            <Field label="Instruções adicionais (opcional)" hint="Ex.: 3 telas, vídeos de até 15 segundos, exclusividade no segmento, multa de rescisão de 1 mensalidade">
-              <textarea name="extra" rows={3} className="input" maxLength={2000} />
-            </Field>
-            <Field label="Anexos (opcional)" hint="PDF ou imagens, como um modelo de contrato, proposta ou tabela de preços. Até 5 arquivos e 4 MB no total.">
-              <input type="file" name="attachments" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif" className="input" />
-            </Field>
-            <p className="text-xs text-ink-400">Os dados da sua empresa (Minha empresa) e do cliente (Clientes e parceiros) entram no contrato automaticamente.</p>
-          </ActionForm>
-        </Modal>
-        <Modal trigger={<><Zap size={16} /> Cobrança simples</>} triggerClass="btn-ghost" title="Cobrança simples" wide>
-          <ActionForm action={saveCharge} submit="Criar cobrança">
-            <p className="text-sm text-ink-500">Para clientes que já têm contrato: cria só a cobrança (avulsa, por período ou recorrente), sem contrato e sem passar pelas etapas.</p>
-            <ChargeFields clients={clients} today={today} services={services} operations={operations} />
-          </ActionForm>
-        </Modal>
-        <Link href="/financeiro/nova" className="btn-primary"><Plus size={16} /> Nova cobrança</Link>
+        <FinanceButtons clients={clients} subs={activeSubs} services={services} operations={operations} today={today} />
       </PageHeader>
 
       {noPix && <p className="mb-4 rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-800 dark:text-ink-200">Cadastre sua chave Pix em <Link href="/empresa#cobranca" className="font-semibold underline">Minha empresa</Link> para que as faturas saiam com QR Code de pagamento.</p>}
@@ -187,11 +153,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                             )}
                             {s.status === 'ativa' && (
                               <Modal trigger={<Ban size={15} />} triggerClass="btn-icon !text-red-600" titleAttr="Cancelar recorrência" title={`Cancelar cobrança de ${s.client.name}?`}>
-                                <ActionForm action={cancelCharge} submit="Cancelar cobrança" submitClass="btn-danger" cancel>
+                                <ActionForm action={cancelCharge} submit="Cancelar recorrência" submitClass="btn-danger" cancel>
                                   <input type="hidden" name="id" value={s.id} />
-                                  <p className="text-sm text-ink-500">O sistema para de gerar faturas para esta cobrança. Faturas já pagas e as vencidas continuam no financeiro.</p>
+                                  <p className="text-sm text-ink-500">A cobrança é encerrada e <b>todas as faturas futuras em aberto</b> dela são canceladas (vão para o arquivo morto). Faturas pagas e vencidas continuam no financeiro.</p>
                                   <Field label="Motivo (opcional)"><input name="reason" className="input" placeholder="Ex.: cliente desistiu" /></Field>
-                                  <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="cancelOpen" defaultChecked className="h-4 w-4" /> Cancelar também as faturas em aberto que ainda não venceram</label>
                                 </ActionForm>
                               </Modal>
                             )}
@@ -204,7 +169,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
               </table>
             </div>
           )}
-          <p className="border-t border-ink-100 p-3 text-xs text-ink-400 dark:border-ink-700">As cobranças recorrentes geram a fatura do mês seguinte automaticamente no último dia de cada mês. Por período, todas as parcelas são geradas na criação.</p>
+          <p className="border-t border-ink-100 p-3 text-xs text-ink-400 dark:border-ink-700">As cobranças recorrentes mantêm sempre 12 faturas projetadas à frente: no último dia de cada mês o sistema gera mais uma. Por período, todas as parcelas são geradas na criação.</p>
         </div>
       )}
 
@@ -251,60 +216,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                         {inv.bankChargeId && <span className="block text-xs text-ink-400">boleto emitido</span>}
                       </td>
                       <td className="td">
-                        <div className="flex justify-end gap-1.5">
-                          <Link href={invoiceLink(inv)} target="_blank" className="btn-icon" title="Abrir fatura (link para o cliente)" aria-label="Abrir fatura"><FileText size={15} /></Link>
-                          {inv.status === 'aberta' && (
-                            <>
-                              <PixButton invoiceId={inv.id} number={inv.number} />
-                              <Modal trigger={<CheckCircle2 size={15} />} triggerClass="btn-icon !text-emerald-600" titleAttr="Registrar pagamento" title={`Registrar pagamento — fatura ${inv.number}`}>
-                                <ActionForm action={payInvoice} submit="Confirmar pagamento">
-                                  <input type="hidden" name="id" value={inv.id} />
-                                  <div className="grid gap-3 sm:grid-cols-3">
-                                    <Field label="Valor recebido"><MoneyInput name="paid" defaultCents={inv.amountCents} /></Field>
-                                    <Field label="Data"><input type="date" name="paidAt" defaultValue={today} className="input" /></Field>
-                                    <Field label="Forma"><select name="method" className="input" defaultValue="pix">{Object.entries(METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-                                    {accounts.length > 0 && <Field label="Entrou na conta" className="sm:col-span-3"><select name="accountId" className="input" defaultValue={suggestedAccount(inv, accounts)}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>}
-                                  </div>
-                                </ActionForm>
-                              </Modal>
-                              {hasBank && !inv.bankChargeId && (
-                                <Modal trigger={<Banknote size={15} />} triggerClass="btn-icon" titleAttr="Gerar boleto" title={`Gerar boleto — fatura ${inv.number}`}>
-                                  <ActionForm action={boletoInvoice} submit="Gerar boleto">
-                                    <input type="hidden" name="id" value={inv.id} />
-                                    <p className="text-sm text-ink-500">O boleto de {fmtMoney(inv.amountCents)} com vencimento em {fmtDate(inv.dueDate)} será registrado no banco integrado, em nome de {inv.client.name}. A fatura passa a mostrar o boleto e o Pix do banco, com baixa automática.</p>
-                                    {!inv.client.document && <p className="text-sm font-semibold text-red-600">Este cadastro está sem CPF/CNPJ. Preencha em Clientes e parceiros antes de gerar o boleto.</p>}
-                                  </ActionForm>
-                                </Modal>
-                              )}
-                              {inv.bankChargeId && (
-                                <Modal trigger={<RefreshCw size={15} />} triggerClass="btn-icon" titleAttr="Consultar pagamento no banco" title="Consultar pagamento no banco">
-                                  <ActionForm action={syncInvoice} submit="Consultar agora"><input type="hidden" name="id" value={inv.id} /><p className="text-sm text-ink-500">Normalmente o banco avisa sozinho quando o boleto é pago. Use se quiser conferir agora.</p></ActionForm>
-                                </Modal>
-                              )}
-                              {!inv.bankChargeId && (
-                                <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar fatura" title={`Editar fatura ${inv.number}`} wide>
-                                  <ActionForm action={updateInvoice}>
-                                    <input type="hidden" name="id" value={inv.id} />
-                                    <Field label="Vencimento"><input type="date" name="dueDate" required defaultValue={inv.dueDate} className="input" /></Field>
-                                    <InvoiceItems initial={invoiceItems(inv)} services={services} />
-                                    <Field label="Observações"><textarea name="notes" rows={2} defaultValue={inv.notes} className="input" /></Field>
-                                  </ActionForm>
-                                </Modal>
-                              )}
-                              <Confirm trigger={<Ban size={15} />} titleAttr="Cancelar fatura" title={`Cancelar a fatura ${inv.number}?`} confirmLabel="Sim, cancelar" action={cancelInvoice} fields={{ id: inv.id }}
-                                text={inv.bankChargeId ? 'A fatura e o boleto no banco serão cancelados. O link deixará de aceitar pagamento.' : 'A fatura deixa de contar como valor a receber. O link mostrará que ela foi cancelada.'} />
-                            </>
-                          )}
-                          {inv.status === 'cancelada' && (
-                            <Confirm trigger={<><RotateCcw size={15} /> Reativar</>} triggerClass="btn-ghost !px-2.5 !py-1.5" titleAttr="Reativar fatura" title={`Reativar a fatura ${inv.number}?`} confirmLabel="Sim, reativar" action={reactivateInvoice} fields={{ id: inv.id }}
-                              text="A fatura sai do arquivo morto e volta a ficar em aberto, com o mesmo número, valor e Pix. Se tinha boleto, emita um novo." />
-                          )}
-                          {inv.status === 'paga' && (
-                            <Confirm trigger={<Undo2 size={15} />} titleAttr="Desfazer pagamento" title="Desfazer o pagamento?" confirmLabel="Sim, desfazer" action={reopenInvoice} fields={{ id: inv.id }}
-                              text="A fatura volta a ficar em aberto. Use quando um pagamento foi registrado por engano." />
-                          )}
-                          {inv.boletoUrl && <a href={inv.boletoUrl} target="_blank" rel="noreferrer" className="btn-icon" title="Boleto no banco" aria-label="Boleto no banco"><ExternalLink size={15} /></a>}
-                        </div>
+                        <InvoiceActions inv={inv} today={today} accounts={accounts} services={services} hasBank={hasBank} />
                       </td>
                     </tr>
                   );

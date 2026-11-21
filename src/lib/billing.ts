@@ -50,15 +50,20 @@ export const lastDayOfMonth = (iso: string) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** Meses que ja deveriam ter fatura para esta cobranca. */
+/** Quantas faturas futuras a cobranca recorrente mantem projetadas. */
+export const RECURRING_AHEAD = 12;
+
+/**
+ * Meses que ja devem ter fatura. Periodo: todas as parcelas. Recorrente: 12 meses projetados a partir do
+ * mes atual (ou do inicio, se for futuro); no ultimo dia de cada mes a janela anda mais um mes.
+ */
 export function monthsDue(sub: Pick<Subscription, 'mode' | 'startMonth' | 'months' | 'dueDay'>, today = localDate()) {
   if (sub.mode === 'periodo') return Array.from({ length: sub.months ?? 1 }, (_, i) => addMonths(sub.startMonth, i));
-  const current = today.slice(0, 7);
+  const current = today >= lastDayOfMonth(today) ? addMonths(today.slice(0, 7), 1) : today.slice(0, 7);
+  const base = sub.startMonth > current ? sub.startMonth : current;
+  const until = addMonths(base, RECURRING_AHEAD - 1);
   const out: string[] = [];
-  for (let m = sub.startMonth; m <= current; m = addMonths(m, 1)) out.push(m);
-  // recorrente: a fatura do mes seguinte e gerada no ultimo dia de cada mes
-  const next = addMonths(current, 1);
-  if (next >= sub.startMonth && !out.includes(next) && today >= lastDayOfMonth(today)) out.push(next);
+  for (let m = sub.startMonth; m <= until; m = addMonths(m, 1)) out.push(m);
   return out;
 }
 
@@ -127,9 +132,9 @@ export async function createSubscription(tenantId: string, data: { clientId: str
 }
 
 /** Cancela a cobranca: nao gera mais faturas. Opcionalmente cancela as faturas em aberto que ainda nao venceram. */
-export async function cancelSubscription(sub: Subscription, opts: { reason?: string | null; cancelOpen: boolean }) {
+export async function cancelSubscription(sub: Subscription, opts: { reason?: string | null; cancelOpen?: boolean }) {
   await db.subscription.update({ where: { id: sub.id }, data: { status: 'cancelada', cancelledAt: new Date(), cancelReason: opts.reason ?? null } });
-  if (!opts.cancelOpen) return 0;
+  if (opts.cancelOpen === false) return 0; // padrao: cancela todas as faturas futuras em aberto
   const tenant = await db.tenant.findUniqueOrThrow({ where: { id: sub.tenantId } });
   const open = await db.invoice.findMany({ where: { subscriptionId: sub.id, status: 'aberta', dueDate: { gte: localDate() } } });
   for (const inv of open) {

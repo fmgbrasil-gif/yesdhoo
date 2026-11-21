@@ -14,13 +14,13 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
   const sp = await searchParams;
   const user = await requireAdmin();
   const t = user.tenant;
-  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao, ate: sp.ate };
-  const { today, list, totals } = await openDebts(user.tenantId, f);
+  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao, ate: sp.ate, futuras: sp.futuras };
+  const { today, list, totals, ate } = await openDebts(user.tenantId, f);
   const op = f.operacao ? await db.operation.findFirst({ where: { id: f.operacao, tenantId: user.tenantId }, select: { name: true } }) : null;
   const logo = fileUrl(t.logo);
   const filtros = [
     f.situacao === 'vencidas' ? 'somente vencidos' : f.situacao === 'avencer' ? 'somente a vencer' : 'todos em aberto',
-    op && `operação ${op.name}`, f.ate && `vencimento até ${fmtDate(f.ate)}`, f.cliente && `cliente contém "${f.cliente}"`,
+    op && `operação ${op.name}`, f.situacao !== 'vencidas' && (ate ? `a vencer até ${fmtDate(ate)}` : 'inclui faturas futuras projetadas'), f.cliente && `cliente contém "${f.cliente}"`,
   ].filter(Boolean).join(' · ');
   const now = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
   const th = 'border-b border-gray-400 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-wide';
