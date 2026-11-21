@@ -19,13 +19,20 @@ export async function defaultAccountId(tenantId: string) {
 }
 
 /** Recebimento de fatura vira entrada no extrato (substitui o lancamento anterior da mesma fatura). */
-export async function recordInvoicePayment(inv: { id: string; tenantId: string; number: number; paidCents: number | null; amountCents: number; paidAt: Date | null; clientName: string }, accountId?: string | null) {
+export async function recordInvoicePayment(inv: { id: string; tenantId: string; number: number; paidCents: number | null; amountCents: number; paidAt: Date | null; clientName: string; operationId?: string | null }, accountId?: string | null) {
   await db.cashEntry.deleteMany({ where: { invoiceId: inv.id } });
   const acc = accountId ? await db.bankAccount.findFirst({ where: { id: accountId, tenantId: inv.tenantId } }) : null;
-  const id = acc?.id ?? (await defaultAccountId(inv.tenantId));
+  const opAcc = !acc && inv.operationId ? (await db.operation.findFirst({ where: { id: inv.operationId }, select: { account: { select: { id: true, active: true } } } }))?.account : null;
+  const id = acc?.id ?? (opAcc?.active ? opAcc.id : null) ?? (await defaultAccountId(inv.tenantId));
   if (!id) return; // empresa ainda sem contas correntes cadastradas
   const date = (inv.paidAt ?? new Date()).toISOString().slice(0, 10);
   await db.cashEntry.create({ data: { tenantId: inv.tenantId, accountId: id, date, kind: 'entrada', amountCents: inv.paidCents ?? inv.amountCents, description: `Fatura nº ${inv.number} — ${inv.clientName}`, category: 'Recebimento de cliente', invoiceId: inv.id } });
 }
 
 export const removeInvoicePayment = (invoiceId: string) => db.cashEntry.deleteMany({ where: { invoiceId } });
+
+/** Conta sugerida para receber uma fatura: a da operacao dela; senao a padrao. */
+export function suggestedAccount(inv: { operation?: { accountId: string | null } | null }, accounts: { id: string }[]) {
+  const op = inv.operation?.accountId;
+  return op && accounts.some((a) => a.id === op) ? op : accounts[0]?.id ?? '';
+}

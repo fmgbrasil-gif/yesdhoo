@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark,
+  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
@@ -34,6 +34,7 @@ const NAV = [
   { href: '/clientes', label: 'Clientes e parceiros', icon: Users },
   { href: '/operacoes', label: 'Operações', icon: Network, admin: true },
   { href: '/financeiro', label: 'Financeiro', icon: Wallet, admin: true },
+  { href: '/receber', label: 'Contas a receber', icon: HandCoins, admin: true },
   { href: '/pagar', label: 'Contas a pagar', icon: Receipt, admin: true },
   { href: '/caixa', label: 'Caixa e contas', icon: Landmark, admin: true },
   { href: '/relatorios', label: 'Relatório de exibições', icon: FileBarChart },

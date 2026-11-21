@@ -211,6 +211,9 @@ model Operation {
   screens       Screen[]
   contracts     Contract[]
   subscriptions Subscription[]
+  invoices      Invoice[]
+  accountId     String?        // conta corrente que recebe os pagamentos desta operacao (ex.: Caixa SkyFit)
+  account       BankAccount?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt     DateTime       @default(now())
   @@index([tenantId])
 }
@@ -255,6 +258,8 @@ model Invoice {
   bankPixPayload String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  operationId  String?
+  operation    Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
   @@unique([tenantId, number])
   @@unique([subscriptionId, competence])
   @@index([tenantId, status, dueDate])
@@ -451,6 +456,7 @@ model BankAccount {
   createdAt    DateTime    @default(now())
   entries      CashEntry[]
   payables     Payable[]
+  operations   Operation[]
   @@index([tenantId])
 }
 

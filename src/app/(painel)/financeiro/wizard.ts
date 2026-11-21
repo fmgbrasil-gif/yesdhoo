@@ -76,7 +76,10 @@ export async function wizardContract(fd: FormData): Promise<Fail | { ok: true; c
   const body = basicContract(user.tenant, client, charge, op, localDate());
   const title = `Contrato — ${client.tradeName || client.name} — ${op.name}`;
   const contract = await db.contract.create({ data: { tenantId: user.tenantId, clientId: client.id, subscriptionId: sub?.id ?? null, operationId: op.id, title, body, publicToken: randomToken(18) } });
-  if (sub) await db.subscription.update({ where: { id: sub.id }, data: { operationId: op.id } });
+  if (sub) {
+    await db.subscription.update({ where: { id: sub.id }, data: { operationId: op.id } });
+    await db.invoice.updateMany({ where: { subscriptionId: sub.id, operationId: null }, data: { operationId: op.id } });
+  } else if (inv) await db.invoice.update({ where: { id: inv.id }, data: { operationId: op.id } });
   revalidatePath('/financeiro');
   return { ok: true, contractId: contract.id, title, body, fileName: contractFileName(client), logo: fileUrl(user.tenant.logo), publicUrl: `/contrato/${contract.publicToken}` };
 }

@@ -12,7 +12,7 @@ const MODES = [
 ] as const;
 
 /** Campos da nova cobranca; o tipo escolhido mostra os campos de data certos. */
-export function ChargeFields({ clients, today, services, fixedClient }: { clients: Opt[]; today: string; services: ServiceOpt[]; fixedClient?: { id: string; name: string } }) {
+export function ChargeFields({ clients, today, services, fixedClient, operations }: { clients: Opt[]; today: string; services: ServiceOpt[]; fixedClient?: { id: string; name: string }; operations?: { id: string; name: string }[] }) {
   const [mode, setMode] = useState<(typeof MODES)[number]['key']>('recorrente');
   const month = today.slice(0, 7);
   return (
@@ -41,6 +41,11 @@ export function ChargeFields({ clients, today, services, fixedClient }: { client
             ))}
           </select>
         </Field>}
+        {operations && operations.length > 0 && (
+          <Field label="Operação (opcional)" hint="Define em qual caixa os pagamentos entram" className="sm:col-span-3">
+            <select name="operationId" className="input" defaultValue=""><option value="">Sem operação (caixa padrão)</option>{operations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
+          </Field>
+        )}
         {mode === 'avulsa' ? (
           <Field label="Vencimento"><input type="date" name="dueDate" required className="input" defaultValue={today} /></Field>
         ) : (

@@ -6,7 +6,7 @@ import { Field, SelectAll } from './ui';
 export type ScreenOpt = { id: string; name: string; place: string };
 
 /** Nome da operacao e os pontos (telas cadastradas em Minhas telas) que ela contempla. */
-export function OperationFields({ screens, op }: { screens: ScreenOpt[]; op?: { id: string; name: string; description: string; screenIds: string[] } }) {
+export function OperationFields({ screens, op, accounts }: { screens: ScreenOpt[]; op?: { id: string; name: string; description: string; screenIds: string[]; accountId?: string | null }; accounts?: { id: string; name: string }[] }) {
   const [sel, setSel] = useState<string[]>(op?.screenIds ?? []);
   const [q, setQ] = useState('');
   const shown = screens.filter((s) => `${s.name} ${s.place}`.toLowerCase().includes(q.toLowerCase()));
@@ -17,6 +17,11 @@ export function OperationFields({ screens, op }: { screens: ScreenOpt[]; op?: { 
       {sel.map((id) => <input key={id} type="hidden" name="screenIds" value={id} />)}
       <Field label="Nome da operação"><input name="name" required maxLength={80} defaultValue={op?.name} className="input" placeholder="Ex.: Rede Delta, Academias Uberaba" /></Field>
       <Field label="Descrição (opcional)"><input name="description" maxLength={500} defaultValue={op?.description} className="input" /></Field>
+      {accounts && (
+        <Field label="Caixa / conta que recebe os pagamentos" hint="As faturas desta operação entram nesta conta ao serem pagas. Ex.: Caixa SkyFit">
+          <select name="accountId" defaultValue={op?.accountId ?? ''} className="input"><option value="">Conta padrão da empresa</option>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+        </Field>
+      )}
       <div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <span className="label">Pontos parceiros desta operação ({sel.length} de {screens.length})</span>

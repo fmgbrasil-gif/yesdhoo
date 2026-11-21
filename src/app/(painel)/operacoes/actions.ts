@@ -17,7 +17,9 @@ export async function upsertOperation(fd: FormData): Promise<{ ok: false; error:
   const screens = await db.screen.findMany({ where: { tenantId: user.tenantId, id: { in: wanted } }, select: { id: true } });
   if (!screens.length) return { ok: false, error: 'Marque ao menos um ponto (tela) da operação.' };
   const id = str(fd, 'id');
-  const data = { name, description: String(fd.get('description') ?? '').slice(0, 500) };
+  const accId = str(fd, 'accountId');
+  const account = accId ? await db.bankAccount.findFirst({ where: { id: accId, tenantId: user.tenantId } }) : null;
+  const data = { name, description: String(fd.get('description') ?? '').slice(0, 500), ...(fd.has('accountId') ? { accountId: account?.id ?? null } : {}) };
   const set = screens.map((s) => ({ id: s.id }));
   let op;
   if (id) {

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SIGN_LABEL } from '@/lib/contract-sign';
+import { suggestedAccount } from '@/lib/cash';
 import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2, RotateCcw, ChevronLeft, ChevronRight, CalendarRange, Zap } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
@@ -32,6 +33,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const { page, size, skip, take } = pageParams(sp);
   const status = sp.situacao;
   const accounts = await db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true } });
+  const operations = await db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
   // periodo de consulta: um mes (padrao: o atual), um intervalo personalizado ou todo o periodo
   const D = /^\d{4}-\d{2}-\d{2}$/;
   const all = sp.mes === 'todos';
@@ -58,7 +60,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   Object.assign(where, periodWhere(where as { dueDate?: { gte?: string; lt?: string } }));
   const sum = (w: object) => db.invoice.aggregate({ where: { tenantId: tid, ...w }, _sum: { amountCents: true }, _count: true });
   const [rows, total, open, overdue, paidMonth, clients] = await Promise.all([
-    db.invoice.findMany({ where, skip, take, orderBy: [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } } } }),
+    db.invoice.findMany({ where, skip, take, orderBy: [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } }, operation: { select: { name: true, accountId: true } } } }),
     db.invoice.count({ where }),
     sum(periodWhere({ status: 'aberta', dueDate: { gte: today } } as never)),
     sum(periodWhere({ status: 'aberta', dueDate: { lt: today } } as never)),
@@ -113,7 +115,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
         <Modal trigger={<><Zap size={16} /> Cobrança simples</>} triggerClass="btn-ghost" title="Cobrança simples" wide>
           <ActionForm action={saveCharge} submit="Criar cobrança">
             <p className="text-sm text-ink-500">Para clientes que já têm contrato: cria só a cobrança (avulsa, por período ou recorrente), sem contrato e sem passar pelas etapas.</p>
-            <ChargeFields clients={clients} today={today} services={services} />
+            <ChargeFields clients={clients} today={today} services={services} operations={operations} />
           </ActionForm>
         </Modal>
         <Link href="/financeiro/nova" className="btn-primary"><Plus size={16} /> Nova cobrança</Link>
@@ -240,7 +242,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                   return (
                     <tr key={inv.id}>
                       <td className="td font-mono text-ink-500">{String(inv.number).padStart(5, '0')}</td>
-                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{inv.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}</span></td>
+                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{inv.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}{inv.operation ? ` · ${inv.operation.name}` : ''}</span></td>
                       <td className="td tabular-nums">{fmtDate(inv.dueDate)}</td>
                       <td className="td text-right font-semibold tabular-nums">{fmtMoney(inv.amountCents)}</td>
                       <td className="td">
@@ -261,7 +263,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                                     <Field label="Valor recebido"><MoneyInput name="paid" defaultCents={inv.amountCents} /></Field>
                                     <Field label="Data"><input type="date" name="paidAt" defaultValue={today} className="input" /></Field>
                                     <Field label="Forma"><select name="method" className="input" defaultValue="pix">{Object.entries(METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
-                                    {accounts.length > 0 && <Field label="Entrou na conta" className="sm:col-span-3"><select name="accountId" className="input" defaultValue={accounts[0].id}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>}
+                                    {accounts.length > 0 && <Field label="Entrou na conta" className="sm:col-span-3"><select name="accountId" className="input" defaultValue={suggestedAccount(inv, accounts)}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>}
                                   </div>
                                 </ActionForm>
                               </Modal>

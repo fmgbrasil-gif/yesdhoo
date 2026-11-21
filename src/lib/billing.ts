@@ -21,14 +21,14 @@ export const STATE_LABEL: Record<string, string> = { aberta: 'Em aberto', vencid
 export const METHODS: Record<string, string> = { pix: 'Pix', boleto: 'Boleto', transferencia: 'Transferência', dinheiro: 'Dinheiro', cartao: 'Cartão' };
 
 /** Cria a fatura com o proximo numero sequencial da empresa. */
-export async function createInvoice(tenantId: string, data: { clientId: string; items: InvoiceItem[]; dueDate: string; competence?: string | null; notes?: string; subscriptionId?: string; installment?: number }) {
+export async function createInvoice(tenantId: string, data: { clientId: string; items: InvoiceItem[]; dueDate: string; competence?: string | null; notes?: string; subscriptionId?: string; installment?: number; operationId?: string | null }) {
   const amountCents = itemsTotal(data.items);
   return db.$transaction(async (tx) => {
     const t = await tx.tenant.update({ where: { id: tenantId }, data: { invoiceSeq: { increment: 1 } }, select: { invoiceSeq: true } });
     return tx.invoice.create({
       data: {
         tenantId, clientId: data.clientId, number: t.invoiceSeq, items: JSON.stringify(data.items), amountCents, dueDate: data.dueDate,
-        competence: data.competence ?? null, notes: data.notes ?? '', subscriptionId: data.subscriptionId ?? null, installment: data.installment ?? null, publicToken: randomToken(18), txid: `FAT${String(t.invoiceSeq).padStart(6, '0')}${randomToken(6).replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 25),
+        competence: data.competence ?? null, notes: data.notes ?? '', subscriptionId: data.subscriptionId ?? null, operationId: data.operationId ?? null, installment: data.installment ?? null, publicToken: randomToken(18), txid: `FAT${String(t.invoiceSeq).padStart(6, '0')}${randomToken(6).replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 25),
       },
     });
   });
@@ -74,7 +74,7 @@ export async function generateForSubscription(sub: Subscription, today = localDa
     const tag = sub.mode === 'periodo' ? ` — parcela ${i + 1}/${months.length} (${competenceLabel(ym)})` : ` — ${competenceLabel(ym)}`;
     try {
       await createInvoice(sub.tenantId, {
-        clientId: sub.clientId, subscriptionId: sub.id, competence: ym, installment: sub.mode === 'periodo' ? i + 1 : undefined,
+        clientId: sub.clientId, subscriptionId: sub.id, operationId: sub.operationId, competence: ym, installment: sub.mode === 'periodo' ? i + 1 : undefined,
         dueDate: dueFor(ym, sub.dueDay), notes: sub.notes, items: items.map((it) => ({ ...it, description: it.description + tag })),
       });
       created++;
@@ -98,7 +98,7 @@ export async function generateFirstPending(sub: Subscription) {
   const tag = sub.mode === 'periodo' ? ` — parcela 1/${sub.months} (${competenceLabel(ym)})` : ` — ${competenceLabel(ym)}`;
   try {
     return await createInvoice(sub.tenantId, {
-      clientId: sub.clientId, subscriptionId: sub.id, competence: ym, installment: sub.mode === 'periodo' ? 1 : undefined,
+      clientId: sub.clientId, subscriptionId: sub.id, operationId: sub.operationId, competence: ym, installment: sub.mode === 'periodo' ? 1 : undefined,
       dueDate: dueFor(ym, sub.dueDay), notes: sub.notes, items: items.map((it) => ({ ...it, description: it.description + tag })),
     });
   } catch (e) {
@@ -177,7 +177,7 @@ export async function markPaid(inv: Invoice, data: { paidCents?: number; method?
     data: { status: 'paga', paidAt: data.paidAt ?? new Date(), paidCents: data.paidCents ?? inv.amountCents, paymentMethod: data.method ?? null },
     include: { client: { select: { name: true } } },
   });
-  // entrada no caixa: na conta escolhida ou na conta padrao (boleto pago no banco)
+  // entrada no caixa: na conta escolhida, na conta da operacao (ex.: Caixa SkyFit) ou na conta padrao
   await recordInvoicePayment({ ...updated, clientName: updated.client.name }, data.accountId);
   await afterPlatformInvoiceChange(inv.clientId);
   return updated;
