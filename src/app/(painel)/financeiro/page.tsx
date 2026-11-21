@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { SIGN_LABEL } from '@/lib/contract-sign';
-import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2 } from 'lucide-react';
+import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2, RotateCcw } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { localDate } from '@/lib/util';
@@ -9,7 +9,7 @@ import { bankOf, competenceLabel, invoiceItems, invoiceLink, invoiceState, METHO
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { ChargeFields } from '@/components/ChargeForm';
-import { boletoInvoice, cancelCharge, cancelInvoice, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice, updateCharge, updateInvoice } from './actions';
+import { boletoInvoice, cancelCharge, cancelInvoice, generateContract, payInvoice, reopenInvoice, saveCharge, syncInvoice, updateCharge, updateInvoice, reactivateInvoice } from './actions';
 import { InvoiceItems } from '@/components/InvoiceItems';
 import { MoneyInput } from '@/components/MoneyInput';
 import { PixButton } from '@/components/PixPanel';
@@ -33,7 +33,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const status = sp.situacao;
   const where = {
     tenantId: tid,
-    ...(status === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : status === 'aberta' ? { status: 'aberta', dueDate: { gte: today } } : status === 'paga' || status === 'cancelada' ? { status } : {}),
+    ...(status === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : status === 'aberta' ? { status: 'aberta', dueDate: { gte: today } } : status === 'paga' || status === 'cancelada' ? { status } : { status: { not: 'cancelada' } }), // canceladas ficam no arquivo morto
     ...(sp.cliente ? { client: { name: like(sp.cliente) } } : {}),
     ...(sp.de ? { dueDate: { gte: sp.de, ...(sp.ate ? { lte: sp.ate } : {}) } } : sp.ate ? { dueDate: { lte: sp.ate } } : {}),
   };
@@ -59,7 +59,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   );
   const hasBank = !!bankOf(user.tenant);
   const noPix = !user.tenant.pixKey && !hasBank;
-  const filters = [['', 'Todas'], ['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['cancelada', 'Canceladas']];
+  const filters = [['', 'Todas'], ['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['cancelada', 'Arquivo morto']];
 
   return (
     <>
@@ -248,6 +248,10 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                               <Confirm trigger={<Ban size={15} />} titleAttr="Cancelar fatura" title={`Cancelar a fatura ${inv.number}?`} confirmLabel="Sim, cancelar" action={cancelInvoice} fields={{ id: inv.id }}
                                 text={inv.bankChargeId ? 'A fatura e o boleto no banco serão cancelados. O link deixará de aceitar pagamento.' : 'A fatura deixa de contar como valor a receber. O link mostrará que ela foi cancelada.'} />
                             </>
+                          )}
+                          {inv.status === 'cancelada' && (
+                            <Confirm trigger={<><RotateCcw size={15} /> Reativar</>} triggerClass="btn-ghost !px-2.5 !py-1.5" titleAttr="Reativar fatura" title={`Reativar a fatura ${inv.number}?`} confirmLabel="Sim, reativar" action={reactivateInvoice} fields={{ id: inv.id }}
+                              text="A fatura sai do arquivo morto e volta a ficar em aberto, com o mesmo número, valor e Pix. Se tinha boleto, emita um novo." />
                           )}
                           {inv.status === 'paga' && (
                             <Confirm trigger={<Undo2 size={15} />} titleAttr="Desfazer pagamento" title="Desfazer o pagamento?" confirmLabel="Sim, desfazer" action={reopenInvoice} fields={{ id: inv.id }}

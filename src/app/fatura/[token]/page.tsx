@@ -11,6 +11,9 @@ import { CopyButton } from '@/components/CopyButton';
 import { PrintButton } from '@/components/PrintButton';
 import { DownloadDocPdf } from '@/components/PdfButtons';
 import { invoiceFileName } from '@/lib/doc-names';
+import { getUser } from '@/lib/auth';
+import { ActionForm } from '@/components/ui';
+import { reactivateInvoice } from '@/app/(painel)/financeiro/actions';
 
 export const metadata: Metadata = { title: 'Fatura', robots: { index: false, follow: false } };
 
@@ -70,6 +73,14 @@ export default async function FaturaPage({ params, searchParams }: { params: Pro
         </div>
         <div className="flex gap-2"><DownloadDocPdf fileName={invoiceFileName(inv, c)} auto={auto} /><PrintButton /></div>
       </div>
+
+      {/* fatura cancelada (arquivo morto): quem e da empresa pode reativar aqui mesmo */}
+      {inv.status === 'cancelada' && (await getUser())?.tenantId === inv.tenantId && (
+        <div className="mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-4 shadow print:hidden">
+          <p className="text-sm text-gray-700"><b>Fatura cancelada</b> — está no arquivo morto do Financeiro. Reative para voltar a cobrar com o mesmo número e o Pix.</p>
+          <ActionForm action={reactivateInvoice} submit="Reativar fatura" submitClass="btn-primary" className="flex items-center gap-2"><input type="hidden" name="id" value={inv.id} /></ActionForm>
+        </div>
+      )}
 
       {/* Pix em destaque na tela, antes da folha */}
       {open && qr && pix && (

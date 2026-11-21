@@ -88,6 +88,17 @@ export async function reopenInvoice(_: ActionResult, fd: FormData): Promise<Acti
   return { ok: true };
 }
 
+/** Tira a fatura do arquivo morto: volta a ficar em aberto (o boleto cancelado no banco nao volta; emita outro). */
+export async function reactivateInvoice(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const inv = await ownInvoice(user.tenantId, String(fd.get('id')));
+  if (!inv || inv.status !== 'cancelada') return { error: 'Só é possível reativar uma fatura cancelada.' };
+  await db.invoice.update({ where: { id: inv.id }, data: { status: 'aberta', bankChargeId: null, boletoUrl: null, boletoLine: null, bankPixPayload: null } });
+  await afterPlatformInvoiceChange(inv.clientId);
+  revalidatePath('/', 'layout');
+  return { ok: true, message: `Fatura ${inv.number} reativada.` };
+}
+
 export async function cancelInvoice(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
   const inv = await ownInvoice(user.tenantId, String(fd.get('id')));
