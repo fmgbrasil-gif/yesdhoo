@@ -8,7 +8,7 @@ import { PixPanel } from './PixPanel';
 import { CnpjLookup } from './CnpjLookup';
 import { CopyButton } from './CopyButton';
 import { OperationFields, type ScreenOpt } from './OperationFields';
-import { Field } from './ui';
+import { Field, SelectAll } from './ui';
 import type { ServiceOpt } from './InvoiceItems';
 import { contractToPdf } from '@/lib/pdf-client';
 import { STATES } from '@/lib/constants';
@@ -356,6 +356,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
             <>
               <fieldset className="space-y-2 rounded-lg border border-ink-100 p-4 dark:border-ink-700">
                 <legend className="label px-1">Documentos</legend>
+                <SelectAll total={contract ? 3 : 2} selected={(contract && pick.contrato ? 1 : 0) + (pick.fatura ? 1 : 0) + (pick.pix ? 1 : 0)} onChange={(on) => setPick({ contrato: on, fatura: on, pix: on })} className="border-b border-ink-100 pb-2 dark:border-ink-700" />
                 {contract && <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={pick.contrato} onChange={(e) => setPick({ ...pick, contrato: e.target.checked })} className="h-4 w-4 accent-violet-600" /> Contrato <span className="text-xs text-ink-400">{contract.fileName}</span></label>}
                 <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={pick.fatura} onChange={(e) => setPick({ ...pick, fatura: e.target.checked })} className="h-4 w-4 accent-violet-600" /> Fatura <span className="text-xs text-ink-400">{docs.invoiceFile}</span></label>
                 <label className="flex items-center gap-3 text-sm"><input type="checkbox" checked={pick.pix} onChange={(e) => setPick({ ...pick, pix: e.target.checked })} className="h-4 w-4 accent-violet-600" /> Pix de pagamento <span className="text-xs text-ink-400">{docs.pixFile}</span></label>

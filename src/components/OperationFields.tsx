@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Field } from './ui';
+import { Field, SelectAll } from './ui';
 
 export type ScreenOpt = { id: string; name: string; place: string };
 
@@ -20,10 +20,7 @@ export function OperationFields({ screens, op }: { screens: ScreenOpt[]; op?: { 
       <div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <span className="label">Pontos parceiros desta operação ({sel.length} de {screens.length})</span>
-          <div className="flex gap-2 text-xs">
-            <button type="button" className="font-semibold text-brand-600" onClick={() => setSel([...new Set([...sel, ...shown.map((s) => s.id)])])}>Marcar todos</button>
-            <button type="button" className="font-semibold text-ink-400" onClick={() => setSel([])}>Limpar</button>
-          </div>
+          <SelectAll total={shown.length} selected={shown.filter((x) => sel.includes(x.id)).length} onChange={(on) => setSel(on ? [...new Set([...sel, ...shown.map((x) => x.id)])] : sel.filter((id) => !shown.some((x) => x.id === id)))} label={q ? 'Marcar todos os encontrados' : 'Marcar todos'} />
         </div>
         {screens.length > 6 && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar ponto..." aria-label="Buscar ponto" className="input mb-2" />}
         {screens.length === 0 ? <p className="text-sm text-ink-400">Nenhuma tela cadastrada. Cadastre os pontos em Minhas telas.</p> : (

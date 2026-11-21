@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useActionState, useContext, useEffect, useState, useTransition, type ReactNode } from 'react';
+import { createContext, useActionState, useContext, useEffect, useRef, useState, useTransition, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { X, Loader2 } from 'lucide-react';
 import { WEEK_DAYS } from '@/lib/constants';
@@ -105,13 +105,15 @@ export function Tabs({ tabs }: { tabs: { label: string; content: ReactNode }[] }
   );
 }
 
-export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
+/** Campo com rotulo. Use group para grupos de opcoes (varias caixas/botoes), que nao podem ficar dentro de um <label>. */
+export function Field({ label, hint, children, className, group }: { label: string; hint?: string; children: ReactNode; className?: string; group?: boolean }) {
+  const Tag = group ? 'div' : 'label';
   return (
-    <label className={`block ${className ?? ''}`}>
+    <Tag className={`block ${className ?? ''}`} {...(group ? { role: 'group', 'aria-label': label } : {})}>
       <span className="label">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-ink-400">{hint}</span>}
-    </label>
+    </Tag>
   );
 }
 
@@ -130,6 +132,7 @@ export function WeekDaysPicker({ name = 'weekDays', defaultValue = '' }: { name?
   return (
     <div>
       <input type="hidden" name={name} value={sel.join(',')} />
+      <SelectAll total={7} selected={sel.length} onChange={(on) => setSel(on ? WEEK_DAYS.map((_, i) => String(i)) : [])} label="Marcar todos os dias" className="mb-1.5 text-xs" />
       <div className="flex flex-wrap gap-1.5">
         {WEEK_DAYS.map((d, i) => {
           const on = sel.includes(String(i));
@@ -146,6 +149,19 @@ export function WeekDaysPicker({ name = 'weekDays', defaultValue = '' }: { name?
 }
 
 /** Selecao multipla com busca (telas, midias...). Envia varios campos com o mesmo nome. */
+/** Caixa "Marcar todos": marcada (todos), parcial (alguns) ou vazia; clicar marca ou desmarca todos. */
+export function SelectAll({ total, selected, onChange, label = 'Marcar todos', className = '' }: { total: number; selected: number; onChange: (all: boolean) => void; label?: string; className?: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const all = total > 0 && selected >= total;
+  useEffect(() => { if (ref.current) ref.current.indeterminate = selected > 0 && !all; }, [selected, all]);
+  return (
+    <label className={`flex cursor-pointer select-none items-center gap-2 text-sm font-semibold ${total === 0 ? 'pointer-events-none opacity-50' : ''} ${className}`}>
+      <input ref={ref} type="checkbox" checked={all} disabled={total === 0} onChange={() => onChange(!all)} className="h-4 w-4 accent-violet-500" />
+      {all ? 'Desmarcar todos' : label}
+    </label>
+  );
+}
+
 export function MultiPicker({ name, options, defaultValue = [], placeholder = 'Buscar...', emptyHint }: {
   name: string; options: { id: string; label: string; sub?: string }[]; defaultValue?: string[]; placeholder?: string; emptyHint?: string;
 }) {
@@ -153,26 +169,27 @@ export function MultiPicker({ name, options, defaultValue = [], placeholder = 'B
   const [q, setQ] = useState('');
   const list = options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()));
   const toggle = (id: string) => setSel(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
+  // "marcar todos" vale para o que esta visivel na busca
+  const shownSel = list.filter((o) => sel.includes(o.id)).length;
+  const setAll = (on: boolean) => setSel(on ? [...new Set([...sel, ...list.map((o) => o.id)])] : sel.filter((id) => !list.some((o) => o.id === id)));
   return (
     <div>
       {sel.map((id) => <input key={id} type="hidden" name={name} value={id} />)}
-      <div className="mb-2 flex gap-2">
-        <input className="input" placeholder={placeholder} value={q} onChange={(e) => setQ(e.target.value)} />
-        <button type="button" className="btn-ghost whitespace-nowrap" onClick={() => setSel(sel.length === options.length ? [] : options.map((o) => o.id))}>
-          {sel.length === options.length && options.length ? 'Limpar' : 'Todas'}
-        </button>
+      <input className="input mb-2" placeholder={placeholder} value={q} onChange={(e) => setQ(e.target.value)} aria-label={placeholder} />
+      <div className="rounded-lg border border-ink-100 dark:border-ink-700">
+        {options.length > 1 && <SelectAll total={list.length} selected={shownSel} onChange={setAll} label={q ? 'Marcar todos os encontrados' : 'Marcar todos'} className="border-b border-ink-100 px-3.5 py-2 dark:border-ink-700" />}
+        <div className="max-h-52 space-y-1 overflow-y-auto p-1.5">
+          {list.length === 0 && <p className="p-2 text-sm text-ink-400">{emptyHint || 'Nada encontrado.'}</p>}
+          {list.map((o) => (
+            <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-ink-50 dark:hover:bg-ink-700">
+              <input type="checkbox" checked={sel.includes(o.id)} onChange={() => toggle(o.id)} className="h-4 w-4 accent-violet-500" />
+              <span className="flex-1 truncate">{o.label}</span>
+              {o.sub && <span className="text-xs text-ink-400">{o.sub}</span>}
+            </label>
+          ))}
+        </div>
       </div>
-      <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-ink-100 p-1.5 dark:border-ink-700">
-        {list.length === 0 && <p className="p-2 text-sm text-ink-400">{emptyHint || 'Nada encontrado.'}</p>}
-        {list.map((o) => (
-          <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-ink-50 dark:hover:bg-ink-700">
-            <input type="checkbox" checked={sel.includes(o.id)} onChange={() => toggle(o.id)} className="h-4 w-4 accent-violet-500" />
-            <span className="flex-1 truncate">{o.label}</span>
-            {o.sub && <span className="text-xs text-ink-400">{o.sub}</span>}
-          </label>
-        ))}
-      </div>
-      <span className="mt-1 block text-xs text-ink-400">{sel.length} selecionada(s)</span>
+      <span className="mt-1 block text-xs text-ink-400">{sel.length} de {options.length} selecionada(s)</span>
     </div>
   );
 }

@@ -53,7 +53,7 @@ export function ScreenFields({ screen, categories, clients }: { screen?: Screen;
               <Field label="Abre às"><input type="time" name="workStart" defaultValue={s?.workStart ?? ''} className="input" /></Field>
               <Field label="Fecha às"><input type="time" name="workEnd" defaultValue={s?.workEnd ?? ''} className="input" /></Field>
             </div>
-            <Field label="Dias de funcionamento"><WeekDaysPicker defaultValue={s?.weekDays} /></Field>
+            <Field label="Dias de funcionamento" group><WeekDaysPicker defaultValue={s?.weekDays} /></Field>
             <Field label="Fluxo médio de pessoas por dia" hint="Usado para estimar o alcance das campanhas"><input type="number" min={0} name="avgFlow" defaultValue={s?.avgFlow ?? ''} className="input" /></Field>
           </>
         ) },

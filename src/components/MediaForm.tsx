@@ -86,7 +86,7 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
         <Field label="Turno — das"><input type="time" name="shiftStart" defaultValue={m?.shiftStart ?? ''} className="input" /></Field>
         <Field label="Turno — até"><input type="time" name="shiftEnd" defaultValue={m?.shiftEnd ?? ''} className="input" /></Field>
       </div>
-      <Field label="Dias da semana"><WeekDaysPicker defaultValue={m?.weekDays} /></Field>
+      <Field label="Dias da semana" group><WeekDaysPicker defaultValue={m?.weekDays} /></Field>
     </>
   );
   const quick = (
