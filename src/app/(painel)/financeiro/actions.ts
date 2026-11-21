@@ -14,6 +14,7 @@ import { afterPlatformInvoiceChange } from '@/lib/tenant';
 import type { ActionResult } from '@/components/ui';
 import { basicContract } from '@/lib/contract-template';
 import { randomToken } from '@/lib/crypto';
+import { removeInvoicePayment } from '@/lib/cash';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -73,7 +74,7 @@ export async function payInvoice(_: ActionResult, fd: FormData): Promise<ActionR
   const paidCents = parseMoney(str(fd, 'paid')) ?? inv.amountCents;
   const method = String(fd.get('method') ?? '');
   const paidAt = str(fd, 'paidAt');
-  await markPaid(inv, { paidCents, method: METHODS[method] ? method : undefined, paidAt: paidAt && DATE.test(paidAt) ? new Date(`${paidAt}T12:00:00`) : new Date() });
+  await markPaid(inv, { paidCents, method: METHODS[method] ? method : undefined, paidAt: paidAt && DATE.test(paidAt) ? new Date(`${paidAt}T12:00:00`) : new Date(), accountId: str(fd, 'accountId') });
   revalidatePath('/', 'layout');
   return { ok: true };
 }
@@ -83,6 +84,7 @@ export async function reopenInvoice(_: ActionResult, fd: FormData): Promise<Acti
   const inv = await ownInvoice(user.tenantId, String(fd.get('id')));
   if (!inv || inv.status !== 'paga') return { error: 'Só é possível estornar uma fatura paga.' };
   await db.invoice.update({ where: { id: inv.id }, data: { status: 'aberta', paidAt: null, paidCents: null, paymentMethod: null } });
+  await removeInvoicePayment(inv.id); // tira a entrada do caixa
   await afterPlatformInvoiceChange(inv.clientId);
   revalidatePath('/', 'layout');
   return { ok: true };

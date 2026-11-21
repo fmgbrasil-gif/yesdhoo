@@ -1,5 +1,6 @@
 import type { Client, Invoice, Subscription, Tenant } from '@prisma/client';
 import { db } from './db';
+import { recordInvoicePayment } from './cash';
 import { decrypt, randomToken } from './crypto';
 import { pixPayload } from './pix';
 import { localDate, parseJson } from './util';
@@ -170,11 +171,14 @@ export function invoicePix(inv: Invoice, tenant: Tenant) {
 }
 
 /** Registra o pagamento. Se for uma fatura da plataforma, pode liberar a empresa bloqueada. */
-export async function markPaid(inv: Invoice, data: { paidCents?: number; method?: string; paidAt?: Date }) {
+export async function markPaid(inv: Invoice, data: { paidCents?: number; method?: string; paidAt?: Date; accountId?: string | null }) {
   const updated = await db.invoice.update({
     where: { id: inv.id },
     data: { status: 'paga', paidAt: data.paidAt ?? new Date(), paidCents: data.paidCents ?? inv.amountCents, paymentMethod: data.method ?? null },
+    include: { client: { select: { name: true } } },
   });
+  // entrada no caixa: na conta escolhida ou na conta padrao (boleto pago no banco)
+  await recordInvoicePayment({ ...updated, clientName: updated.client.name }, data.accountId);
   await afterPlatformInvoiceChange(inv.clientId);
   return updated;
 }

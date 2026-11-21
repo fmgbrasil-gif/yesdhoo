@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { SIGN_LABEL } from '@/lib/contract-sign';
-import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2, RotateCcw } from 'lucide-react';
+import { Ban, Banknote, CheckCircle2, Pencil, ExternalLink, FileSignature, FileText, Plus, RefreshCw, Repeat, Search, Settings, Undo2, RotateCcw, ChevronLeft, ChevronRight, CalendarRange, Zap } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { localDate } from '@/lib/util';
 import { fmtDate, fmtMoney } from '@/lib/money';
-import { bankOf, competenceLabel, invoiceItems, invoiceLink, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
+import { addMonths, bankOf, competenceLabel, invoiceItems, invoiceLink, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { ChargeFields } from '@/components/ChargeForm';
@@ -31,19 +31,38 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const month = today.slice(0, 7);
   const { page, size, skip, take } = pageParams(sp);
   const status = sp.situacao;
+  const accounts = await db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true } });
+  // periodo de consulta: um mes (padrao: o atual), um intervalo personalizado ou todo o periodo
+  const D = /^\d{4}-\d{2}-\d{2}$/;
+  const all = sp.mes === 'todos';
+  const custom = !all && (D.test(sp.de ?? '') || D.test(sp.ate ?? ''));
+  const mes = !all && !custom && /^\d{4}-\d{2}$/.test(sp.mes ?? '') ? sp.mes! : month;
+  const lastDay = (ym: string) => `${ym}-${String(new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate()).padStart(2, '0')}`;
+  const de = all ? null : custom ? (D.test(sp.de ?? '') ? sp.de! : '2000-01-01') : `${mes}-01`;
+  const ate = all ? null : custom ? (D.test(sp.ate ?? '') ? sp.ate! : '2100-12-31') : lastDay(mes);
+  const inPeriod = de && ate ? { dueDate: { gte: de, lte: ate } } : {};
+  const paidPeriod = de && ate ? { paidAt: { gte: new Date(`${de}T00:00:00-03:00`), lte: new Date(`${ate}T23:59:59-03:00`) } } : {};
+  const periodParams: Record<string, string> = all ? { mes: 'todos' } : custom ? { ...(sp.de ? { de: sp.de } : {}), ...(sp.ate ? { ate: sp.ate } : {}) } : mes === month ? {} : { mes };
+  const qs = (extra: Record<string, string | undefined>) => { const q = new URLSearchParams(); for (const [k, v] of Object.entries({ ...periodParams, ...extra })) if (v) q.set(k, v); const t = q.toString(); return t ? `/financeiro?${t}` : '/financeiro'; };
+  const monthName = (ym: string) => { const t = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${ym}-15T12:00:00Z`)); return t[0].toUpperCase() + t.slice(1); };
   const where = {
     tenantId: tid,
     ...(status === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : status === 'aberta' ? { status: 'aberta', dueDate: { gte: today } } : status === 'paga' || status === 'cancelada' ? { status } : { status: { not: 'cancelada' } }), // canceladas ficam no arquivo morto
     ...(sp.cliente ? { client: { name: like(sp.cliente) } } : {}),
-    ...(sp.de ? { dueDate: { gte: sp.de, ...(sp.ate ? { lte: sp.ate } : {}) } } : sp.ate ? { dueDate: { lte: sp.ate } } : {}),
   };
+  const periodWhere = (w: { dueDate?: { gte?: string; lt?: string } }) => {
+    if (!de || !ate) return w;
+    const r = { gte: de, lte: ate, ...(w.dueDate?.gte && w.dueDate.gte > de ? { gte: w.dueDate.gte } : {}), ...(w.dueDate?.lt ? { lt: w.dueDate.lt } : {}) };
+    return { ...w, dueDate: r };
+  };
+  Object.assign(where, periodWhere(where as { dueDate?: { gte?: string; lt?: string } }));
   const sum = (w: object) => db.invoice.aggregate({ where: { tenantId: tid, ...w }, _sum: { amountCents: true }, _count: true });
   const [rows, total, open, overdue, paidMonth, clients] = await Promise.all([
     db.invoice.findMany({ where, skip, take, orderBy: [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } } } }),
     db.invoice.count({ where }),
-    sum({ status: 'aberta', dueDate: { gte: today } }),
-    sum({ status: 'aberta', dueDate: { lt: today } }),
-    db.invoice.aggregate({ where: { tenantId: tid, status: 'paga', paidAt: { gte: new Date(`${month}-01T00:00:00-03:00`) } }, _sum: { paidCents: true }, _count: true }),
+    sum(periodWhere({ status: 'aberta', dueDate: { gte: today } } as never)),
+    sum(periodWhere({ status: 'aberta', dueDate: { lt: today } } as never)),
+    db.invoice.aggregate({ where: { tenantId: tid, status: 'paga', ...paidPeriod }, _sum: { paidCents: true }, _count: true }),
     db.client.findMany({ where: { tenantId: tid, active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
   ]);
   const subs = await db.subscription.findMany({
@@ -91,15 +110,40 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
             <p className="text-xs text-ink-400">Os dados da sua empresa (Minha empresa) e do cliente (Clientes e parceiros) entram no contrato automaticamente.</p>
           </ActionForm>
         </Modal>
+        <Modal trigger={<><Zap size={16} /> Cobrança simples</>} triggerClass="btn-ghost" title="Cobrança simples" wide>
+          <ActionForm action={saveCharge} submit="Criar cobrança">
+            <p className="text-sm text-ink-500">Para clientes que já têm contrato: cria só a cobrança (avulsa, por período ou recorrente), sem contrato e sem passar pelas etapas.</p>
+            <ChargeFields clients={clients} today={today} services={services} />
+          </ActionForm>
+        </Modal>
         <Link href="/financeiro/nova" className="btn-primary"><Plus size={16} /> Nova cobrança</Link>
       </PageHeader>
 
       {noPix && <p className="mb-4 rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-800 dark:text-ink-200">Cadastre sua chave Pix em <Link href="/empresa#cobranca" className="font-semibold underline">Minha empresa</Link> para que as faturas saiam com QR Code de pagamento.</p>}
 
+      <div className="card mb-4 flex flex-wrap items-center gap-2 p-3">
+        <span className="label mr-1">Período</span>
+        {!all && !custom && <Link href={qs({ mes: addMonths(mes, -1) })} className="btn-icon" aria-label="Mês anterior" title="Mês anterior"><ChevronLeft size={16} /></Link>}
+        <span className="min-w-40 text-center font-bold">{all ? 'Todo o período' : custom ? `${fmtDate(de)} a ${fmtDate(ate)}` : monthName(mes)}</span>
+        {!all && !custom && <Link href={qs({ mes: addMonths(mes, 1) })} className="btn-icon" aria-label="Próximo mês" title="Próximo mês"><ChevronRight size={16} /></Link>}
+        <form className="flex items-center gap-1" action="/financeiro">
+          <input type="month" name="mes" defaultValue={!all && !custom ? mes : ''} aria-label="Escolher mês" className="input !py-1.5" />
+          <button className="btn-ghost !py-1.5">Ir</button>
+        </form>
+        <Modal trigger={<><CalendarRange size={15} /> Período personalizado</>} triggerClass="btn-ghost !py-1.5" title="Período personalizado">
+          <form action="/financeiro" className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2"><Field label="De"><input type="date" name="de" required defaultValue={de ?? ''} className="input" /></Field><Field label="Até"><input type="date" name="ate" required defaultValue={ate ?? ''} className="input" /></Field></div>
+            <div className="flex justify-end"><button className="btn-primary">Aplicar</button></div>
+          </form>
+        </Modal>
+        {(all || custom || mes !== month) && <Link href="/financeiro" className="btn-ghost !py-1.5">Mês atual</Link>}
+        {!all && <Link href="/financeiro?mes=todos" className="btn-ghost !py-1.5">Todo o período</Link>}
+      </div>
+
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <div className="card p-4"><p className="text-xs font-semibold uppercase text-ink-400">A receber</p><p className="text-2xl font-black tabular-nums">{fmtMoney(open._sum.amountCents)}</p><p className="text-xs text-ink-400">{open._count} fatura(s) no prazo</p></div>
-        <div className="card p-4"><p className="text-xs font-semibold uppercase text-red-600">Vencido</p><p className="text-2xl font-black tabular-nums text-red-600">{fmtMoney(overdue._sum.amountCents)}</p><p className="text-xs text-ink-400">{overdue._count} fatura(s) em atraso</p></div>
-        <div className="card p-4"><p className="text-xs font-semibold uppercase text-emerald-600">Recebido no mês</p><p className="text-2xl font-black tabular-nums text-emerald-600">{fmtMoney(paidMonth._sum.paidCents)}</p><p className="text-xs text-ink-400">{paidMonth._count} pagamento(s)</p></div>
+        <div className="card p-4"><p className="text-xs font-semibold uppercase text-ink-400">A receber{de ? ' no período' : ''}</p><p className="text-2xl font-black tabular-nums">{fmtMoney(open._sum.amountCents)}</p><p className="text-xs text-ink-400">{open._count} fatura(s) no prazo</p></div>
+        <div className="card p-4"><p className="text-xs font-semibold uppercase text-red-600">Vencido{de ? ' no período' : ''}</p><p className="text-2xl font-black tabular-nums text-red-600">{fmtMoney(overdue._sum.amountCents)}</p><p className="text-xs text-ink-400">{overdue._count} fatura(s) em atraso</p></div>
+        <div className="card p-4"><p className="text-xs font-semibold uppercase text-emerald-600">Recebido{de ? ' no período' : ''}</p><p className="text-2xl font-black tabular-nums text-emerald-600">{fmtMoney(paidMonth._sum.paidCents)}</p><p className="text-xs text-ink-400">{paidMonth._count} pagamento(s)</p></div>
       </div>
 
       <nav className="mb-4 flex gap-2 border-b border-ink-100 dark:border-ink-700" aria-label="Seções do financeiro">
@@ -177,14 +221,13 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
       {tab === 'faturas' && <div className="card overflow-hidden">
         <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">
           {filters.map(([k, label]) => (
-            <Link key={k} href={k ? `/financeiro?situacao=${k}` : '/financeiro'} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${(status ?? '') === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
+            <Link key={k} href={qs({ situacao: k || undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${(status ?? '') === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
           ))}
         </div>
         <form className="flex flex-wrap items-end gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
           {status && <input type="hidden" name="situacao" value={status} />}
+          {Object.entries(periodParams).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <input name="cliente" defaultValue={sp.cliente} placeholder="Cliente ou parceiro..." className="input w-56" aria-label="Cliente ou parceiro" />
-          <label className="text-xs text-ink-400">Vencimento de<input type="date" name="de" defaultValue={sp.de} className="input" /></label>
-          <label className="text-xs text-ink-400">até<input type="date" name="ate" defaultValue={sp.ate} className="input" /></label>
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>
         </form>
         {rows.length === 0 ? <Empty title="Nenhuma fatura" text="Use “Nova cobrança” para criar uma fatura avulsa, por período ou recorrente." /> : (
@@ -218,6 +261,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                                     <Field label="Valor recebido"><MoneyInput name="paid" defaultCents={inv.amountCents} /></Field>
                                     <Field label="Data"><input type="date" name="paidAt" defaultValue={today} className="input" /></Field>
                                     <Field label="Forma"><select name="method" className="input" defaultValue="pix">{Object.entries(METHODS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+                                    {accounts.length > 0 && <Field label="Entrou na conta" className="sm:col-span-3"><select name="accountId" className="input" defaultValue={accounts[0].id}>{accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>}
                                   </div>
                                 </ActionForm>
                               </Modal>
