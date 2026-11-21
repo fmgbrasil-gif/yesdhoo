@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
-import { FileDown, MessageCircle, Printer, Search } from 'lucide-react';
+import { ChevronDown, FileDown, MessageCircle, Printer, Search } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { fmtDate, fmtMoney } from '@/lib/money';
@@ -79,8 +79,9 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
           <ul className="divide-y divide-ink-100 dark:divide-ink-700">
             {list.map((g) => (
               <li key={g.client.id}>
-                <details className="group">
+                <details className="group" open>
                   <summary className="flex cursor-pointer flex-wrap items-center gap-3 p-4 hover:bg-ink-50 dark:hover:bg-ink-700/40">
+                    <ChevronDown size={16} className="shrink-0 -rotate-90 text-ink-400 transition-transform group-open:rotate-0" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold">{g.client.tradeName || g.client.name}</span>
                       <span className="text-xs text-ink-400">{[fmtDoc(g.client.document), g.client.phone1, `${g.items.length} fatura(s)`].filter(Boolean).join(' · ')}</span>
