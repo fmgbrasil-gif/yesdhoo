@@ -1,4 +1,3 @@
-import 'server-only';
 import { db } from './db';
 
 export const ACCOUNT_KINDS: Record<string, string> = { caixa: 'Caixa (dinheiro)', banco: 'Conta bancária', carteira: 'Carteira digital' };
