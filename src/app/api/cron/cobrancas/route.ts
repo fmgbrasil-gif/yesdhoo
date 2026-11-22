@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { db } from '@/lib/db';
 import { runRecurring } from '@/lib/billing';
+import { runPayableSeries } from '@/lib/payables';
 import { enforceBilling } from '@/lib/tenant';
 
 /**
@@ -15,7 +16,8 @@ export async function GET(req: Request) {
     return Response.json({ error: 'Não autorizado' }, { status: 401 });
   }
   const result = await runRecurring();
+  const payables = await runPayableSeries(); // contas fixas mensais: mantem 12 meses lancados
   const tenants = await db.tenant.findMany({ where: { isPlatform: false, autoBlockDays: { not: null } }, select: { id: true } });
   for (const t of tenants) await enforceBilling(t.id);
-  return Response.json({ ok: true, ...result, checkedTenants: tenants.length });
+  return Response.json({ ok: true, ...result, payables, checkedTenants: tenants.length });
 }

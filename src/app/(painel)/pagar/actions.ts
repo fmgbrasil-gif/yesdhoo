@@ -7,6 +7,7 @@ import { str, localDate } from '@/lib/util';
 import { parseMoney } from '@/lib/money';
 import { randomToken } from '@/lib/crypto';
 import { addMonths } from '@/lib/billing';
+import { generatePayables } from '@/lib/payables';
 import type { ActionResult } from '@/components/ui';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -34,6 +35,12 @@ export async function savePayable(_: ActionResult, fd: FormData): Promise<Action
     if (!p || p.status !== 'aberta') return { error: 'Só é possível editar contas em aberto.' };
     await db.payable.update({ where: { id }, data });
     return done('Conta atualizada.');
+  }
+  if (str(fd, 'repeat') === 'recorrente') {
+    // despesa fixa mensal: 12 meses lancados a frente, mais um no ultimo dia de cada mes, ate cancelar
+    const s = await db.payableSeries.create({ data: { tenantId: user.tenantId, description: data.description, supplier: data.supplier, category: data.category, amountCents: data.amountCents, notes: data.notes, dueDay: Number(dueDate.slice(8, 10)), startMonth: dueDate.slice(0, 7) } });
+    const n = await generatePayables(s);
+    return done(`Conta fixa mensal criada: ${n} meses lançados. Todo último dia do mês o sistema lança mais um.`);
   }
   const times = Math.min(60, Math.max(1, Number(str(fd, 'repeat') ?? 1) || 1));
   const groupId = times > 1 ? randomToken(12) : null;
@@ -90,4 +97,28 @@ export async function cancelPayable(_: ActionResult, fd: FormData): Promise<Acti
     data: { status: 'cancelada' },
   });
   return done(r.count > 1 ? `${r.count} contas canceladas.` : 'Conta cancelada.');
+}
+
+/** Cancela a despesa fixa mensal e todas as contas futuras em aberto dela. */
+export async function cancelPayableSeries(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const s = await db.payableSeries.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId, status: 'ativa' } });
+  if (!s) return { error: 'Recorrência não encontrada ou já cancelada.' };
+  await db.payableSeries.update({ where: { id: s.id }, data: { status: 'cancelada', cancelledAt: new Date() } });
+  const r = await db.payable.updateMany({ where: { seriesId: s.id, status: 'aberta', dueDate: { gte: localDate() } }, data: { status: 'cancelada' } });
+  return done(`Recorrência cancelada${r.count ? ` e ${r.count} conta(s) futura(s) canceladas` : ''}.`);
+}
+
+/** Altera valor, descricao, fornecedor ou categoria da despesa fixa; vale para as contas futuras em aberto. */
+export async function updatePayableSeries(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireAdmin();
+  const s = await db.payableSeries.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId, status: 'ativa' } });
+  if (!s) return { error: 'Recorrência não encontrada ou cancelada.' };
+  const description = str(fd, 'description')?.slice(0, 200);
+  const amountCents = parseMoney(str(fd, 'amount'));
+  if (!description || !amountCents || amountCents <= 0) return { error: 'Informe descrição e valor.' };
+  const data = { description, amountCents, supplier: str(fd, 'supplier')?.slice(0, 120) ?? null, category: str(fd, 'category')?.slice(0, 60) ?? 'Outros' };
+  await db.payableSeries.update({ where: { id: s.id }, data });
+  const r = await db.payable.updateMany({ where: { seriesId: s.id, status: 'aberta', dueDate: { gte: localDate() } }, data });
+  return done(`Recorrência atualizada (${r.count} conta(s) futura(s) ajustadas).`);
 }

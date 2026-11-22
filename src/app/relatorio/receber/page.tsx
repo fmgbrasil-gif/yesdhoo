@@ -4,7 +4,9 @@ import { db } from '@/lib/db';
 import { fileUrl } from '@/lib/storage';
 import { fmtDate, fmtMoney } from '@/lib/money';
 import { fmtDoc } from '@/lib/docs';
-import { openDebts } from '@/lib/receivables';
+import { openDebts, REPORT_TITLE, SITUACOES } from '@/lib/receivables';
+import { resolvePeriod } from '@/lib/period';
+import { localDate } from '@/lib/util';
 import { PrintButton } from '@/components/PrintButton';
 
 export const metadata: Metadata = { title: 'Relatório de débitos em aberto', robots: { index: false, follow: false } };
@@ -14,13 +16,15 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
   const sp = await searchParams;
   const user = await requireAdmin();
   const t = user.tenant;
-  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao, ate: sp.ate, futuras: sp.futuras };
-  const { today, list, totals, ate } = await openDebts(user.tenantId, f);
+  const per = resolvePeriod(sp, localDate());
+  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao ?? '', de: per.de, ate: per.ate, por: sp.por };
+  const { today, list, totals } = await openDebts(user.tenantId, f);
   const op = f.operacao ? await db.operation.findFirst({ where: { id: f.operacao, tenantId: user.tenantId }, select: { name: true } }) : null;
   const logo = fileUrl(t.logo);
   const filtros = [
-    f.situacao === 'vencidas' ? 'somente vencidos' : f.situacao === 'avencer' ? 'somente a vencer' : 'todos em aberto',
-    op && `operação ${op.name}`, f.situacao !== 'vencidas' && (ate ? `a vencer até ${fmtDate(ate)}` : 'inclui faturas futuras projetadas'), f.cliente && `cliente contém "${f.cliente}"`,
+    (SITUACOES.find(([k]) => k === f.situacao)?.[1] ?? 'Todas').toLowerCase(),
+    per.de && per.ate ? `${sp.por === 'ref' ? 'referência' : 'vencimento'} de ${fmtDate(per.de)} a ${fmtDate(per.ate)}` : 'todo o período',
+    op && `operação ${op.name}`, f.cliente && `cliente contém "${f.cliente}"`,
   ].filter(Boolean).join(' · ');
   const now = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).format(new Date());
   const th = 'border-b border-gray-400 px-2 py-1 text-left text-[10px] font-bold uppercase tracking-wide';
@@ -37,14 +41,14 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
         <header className="mb-4 flex items-center gap-4 border-b-2 border-black pb-3">
           {logo && <img src={logo} alt="" className="h-12 w-auto" />}{/* eslint-disable-line @next/next/no-img-element */}
           <div className="flex-1">
-            <h1 className="text-base font-bold uppercase tracking-wide">Relatório de débitos em aberto</h1>
+            <h1 className="text-base font-bold uppercase tracking-wide">{REPORT_TITLE[f.situacao] ?? REPORT_TITLE['']}</h1>
             <p>{t.tradeName || t.name}{t.document ? ` · CNPJ ${fmtDoc(t.document)}` : ''}</p>
             <p className="text-gray-600">Posição em {fmtDate(today)} · {filtros} · emitido em {now}</p>
           </div>
         </header>
 
         <section className="mb-5 grid grid-cols-4 gap-2 text-center">
-          {[['Total em aberto', totals.total, ''], ['Vencido', totals.overdue, 'text-red-700'], ['A vencer', totals.open, ''], ['Clientes / faturas', null, '']].map(([l, v, c]) => (
+          {[['Vencido', totals.overdue, 'text-red-700'], ['A vencer', totals.open, ''], ['Recebido', totals.paid, 'text-emerald-700'], ['Clientes / faturas', null, '']].map(([l, v, c]) => (
             <div key={String(l)} className="rounded border border-gray-400 p-2">
               <p className="text-[9px] font-bold uppercase text-gray-600">{String(l)}</p>
               <p className={`text-sm font-bold ${c}`}>{v === null ? `${totals.clients} / ${totals.invoices}` : fmtMoney(v as number)}</p>
@@ -52,14 +56,14 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
           ))}
         </section>
 
-        {list.length === 0 ? <p className="py-10 text-center text-gray-500">Nenhum débito em aberto com estes filtros.</p> : list.map((g) => (
+        {list.length === 0 ? <p className="py-10 text-center text-gray-500">Nenhuma fatura com estes filtros.</p> : list.map((g) => (
           <section key={g.client.id} className="cliente mb-4">
             <div className="flex items-baseline justify-between border-b border-black bg-gray-100 px-2 py-1">
               <p className="font-bold uppercase">{g.client.name}{g.client.tradeName && g.client.tradeName !== g.client.name ? ` (${g.client.tradeName})` : ''}</p>
               <p className="text-gray-700">{[fmtDoc(g.client.document), g.client.phone1].filter(Boolean).join(' · ')}</p>
             </div>
             <table className="w-full">
-              <thead><tr><th className={th}>Fatura</th><th className={th}>Referência</th><th className={th}>Operação</th><th className={th}>Vencimento</th><th className={`${th} text-right`}>Atraso</th><th className={`${th} text-right`}>Valor</th></tr></thead>
+              <thead><tr><th className={th}>Fatura</th><th className={th}>Referência</th><th className={th}>Operação</th><th className={th}>Vencimento</th><th className={`${th} text-right`}>Atraso / situação</th><th className={`${th} text-right`}>Valor</th></tr></thead>
               <tbody>
                 {g.items.map((i) => (
                   <tr key={i.id} className="border-b border-gray-200">
@@ -67,14 +71,14 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
                     <td className={td}>{i.ref}</td>
                     <td className={td}>{i.operation ?? '—'}</td>
                     <td className={`${td} ${i.late ? 'font-bold text-red-700' : ''}`}>{fmtDate(i.dueDate)}</td>
-                    <td className={`${td} text-right`}>{i.late ? `${i.late} dia(s)` : '—'}</td>
+                    <td className={`${td} text-right`}>{i.state === 'paga' ? 'paga' : i.state === 'cancelada' ? 'cancelada' : i.late ? `${i.late} dia(s)` : '—'}</td>
                     <td className={`${td} text-right font-semibold`}>{fmtMoney(i.amountCents)}</td>
                   </tr>
                 ))}
                 <tr className="font-bold">
-                  <td className={td} colSpan={4}>Subtotal{g.overdueCents ? ` · vencido ${fmtMoney(g.overdueCents)}` : ''}{g.openCents ? ` · a vencer ${fmtMoney(g.openCents)}` : ''}</td>
+                  <td className={td} colSpan={4}>Subtotal{g.overdueCents ? ` · vencido ${fmtMoney(g.overdueCents)}` : ''}{g.openCents ? ` · a vencer ${fmtMoney(g.openCents)}` : ''}{g.paidCents ? ` · recebido ${fmtMoney(g.paidCents)}` : ''}</td>
                   <td className={`${td} text-right`}>{g.maxLate ? `até ${g.maxLate} dia(s)` : ''}</td>
-                  <td className={`${td} text-right`}>{fmtMoney(g.overdueCents + g.openCents)}</td>
+                  <td className={`${td} text-right`}>{fmtMoney(g.overdueCents + g.openCents + g.paidCents + g.otherCents)}</td>
                 </tr>
               </tbody>
             </table>
@@ -82,7 +86,7 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
         ))}
 
         {list.length > 0 && (
-          <div className="mt-4 flex justify-end border-t-2 border-black pt-2 text-sm font-bold">TOTAL GERAL EM ABERTO: {fmtMoney(totals.total)}</div>
+          <div className="mt-4 flex justify-end border-t-2 border-black pt-2 text-sm font-bold">{f.situacao === 'paga' ? 'TOTAL RECEBIDO' : f.situacao === 'cancelada' ? 'TOTAL CANCELADO' : f.situacao === '' ? 'TOTAL GERAL' : 'TOTAL EM ABERTO'}: {fmtMoney(totals.total)}</div>
         )}
       </article>
     </main>

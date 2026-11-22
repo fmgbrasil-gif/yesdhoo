@@ -4,7 +4,9 @@ import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { fmtDate, fmtMoney } from '@/lib/money';
 import { localDate } from '@/lib/util';
-import { ACCOUNT_KINDS, ENTRY_CATEGORIES, PAYABLE_CATEGORIES, balances } from '@/lib/cash';
+import { ACCOUNT_KINDS, balances } from '@/lib/cash';
+import { optionsFor } from '@/lib/options';
+import { OptionInput } from '@/components/OptionInput';
 import { Empty, PageHeader } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
@@ -37,7 +39,7 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
   const today = localDate();
   const de = /^\d{4}-\d{2}-\d{2}$/.test(sp.de ?? '') ? sp.de! : `${today.slice(0, 7)}-01`;
   const ate = /^\d{4}-\d{2}-\d{2}$/.test(sp.ate ?? '') ? sp.ate! : today;
-  const accounts = await balances(tid);
+  const [accounts, descOpts, catOpts] = await Promise.all([balances(tid), optionsFor(tid, 'lancamento'), optionsFor(tid, 'categoria')]);
   const active = accounts.filter((a) => a.active);
   const conta = accounts.find((a) => a.id === sp.conta) ?? null;
   const where = { tenantId: tid, date: { gte: de, lte: ate }, ...(conta ? { accountId: conta.id } : {}) };
@@ -74,8 +76,8 @@ export default async function CaixaPage({ searchParams }: { searchParams: Promis
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Tipo"><select name="kind" className="input"><option value="entrada">Entrada (dinheiro que entra)</option><option value="saida">Saída (dinheiro que sai)</option></select></Field>
                 {accountSelect('accountId', 'Conta')}
-                <Field label="Descrição" className="sm:col-span-2"><input name="description" required maxLength={200} className="input" /></Field>
-                <Field label="Categoria"><input name="category" list="cat-lanc" className="input" /><datalist id="cat-lanc">{[...ENTRY_CATEGORIES, ...PAYABLE_CATEGORIES].map((c) => <option key={c} value={c} />)}</datalist></Field>
+                <Field label="Descrição" className="sm:col-span-2" group><OptionInput name="description" kind="lancamento" label="Descrição" options={descOpts} required /></Field>
+                <Field label="Categoria" group><OptionInput name="category" kind="categoria" label="Categoria" options={catOpts} /></Field>
                 <Field label="Valor"><MoneyInput name="amount" required /></Field>
                 <Field label="Data"><input type="date" name="date" defaultValue={today} className="input" /></Field>
               </div>

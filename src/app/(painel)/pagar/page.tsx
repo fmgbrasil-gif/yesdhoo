@@ -1,32 +1,35 @@
 import Link from 'next/link';
-import { Ban, CheckCircle2, Pencil, Plus, RotateCcw, Undo2 } from 'lucide-react';
+import { Ban, CheckCircle2, Pencil, Plus, Repeat, RotateCcw, Undo2 } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { fmtDate, fmtMoney } from '@/lib/money';
 import { localDate } from '@/lib/util';
-import { PAYABLE_CATEGORIES } from '@/lib/cash';
+import { optionsFor } from '@/lib/options';
+import { OptionInput } from '@/components/OptionInput';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { MoneyInput } from '@/components/MoneyInput';
-import { cancelPayable, payPayable, savePayable, unpayPayable } from './actions';
+import { cancelPayable, cancelPayableSeries, payPayable, savePayable, unpayPayable, updatePayableSeries } from './actions';
+import { runPayableSeries, seriesLabel } from '@/lib/payables';
+import { PeriodBar } from '@/components/PeriodBar';
+import { periodHref, resolvePeriod } from '@/lib/period';
 
 export const metadata = { title: 'Contas a pagar' };
 
+type Opts = { desc: string[]; sup: string[]; cat: string[] };
 type P = { id: string; description: string; supplier: string | null; category: string; amountCents: number; dueDate: string; notes: string };
 
-function PayableFields({ p, today, suppliers }: { p?: P; today: string; suppliers: string[] }) {
+function PayableFields({ p, today, opts }: { p?: P; today: string; opts: Opts }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {p && <input type="hidden" name="id" value={p.id} />}
-      <Field label="Descrição" className="sm:col-span-2"><input name="description" required maxLength={200} defaultValue={p?.description} className="input" placeholder="Ex.: Aluguel da sala, Internet, Comissão ponto X" /></Field>
-      <Field label="Fornecedor / favorecido"><input name="supplier" list="fornecedores" maxLength={120} defaultValue={p?.supplier ?? ''} className="input" /></Field>
-      <Field label="Categoria"><input name="category" list="categorias-pagar" required defaultValue={p?.category ?? ''} className="input" /></Field>
+      <Field label="Descrição" className="sm:col-span-2" group><OptionInput name="description" kind="despesa" label="Descrição" options={opts.desc} defaultValue={p?.description} required placeholder="Ex.: Aluguel da sala, Internet, Comissão ponto X" /></Field>
+      <Field label="Fornecedor / favorecido" group><OptionInput name="supplier" kind="fornecedor" label="Fornecedor" options={opts.sup} defaultValue={p?.supplier} /></Field>
+      <Field label="Categoria" group><OptionInput name="category" kind="categoria" label="Categoria" options={opts.cat} defaultValue={p?.category} required /></Field>
       <Field label="Valor"><MoneyInput name="amount" defaultCents={p?.amountCents} required /></Field>
       <Field label="Vencimento"><input type="date" name="dueDate" required defaultValue={p?.dueDate ?? today} className="input" /></Field>
-      {!p && <Field label="Repetir" hint="Lança a mesma conta nos meses seguintes"><select name="repeat" className="input" defaultValue="1"><option value="1">Não repetir</option>{[2, 3, 6, 12, 24, 36].map((n) => <option key={n} value={n}>Por {n} meses</option>)}</select></Field>}
+      {!p && <Field label="Repetir" hint="Recorrente: conta fixa mensal, sempre 12 meses lançados à frente até você cancelar"><select name="repeat" className="input" defaultValue="1"><option value="1">Não repetir</option><option value="recorrente">Recorrente — todo mês, até cancelar</option>{[2, 3, 6, 12, 24, 36].map((n) => <option key={n} value={n}>Por {n} meses</option>)}</select></Field>}
       <Field label="Observações" className="sm:col-span-2"><textarea name="notes" rows={2} maxLength={1000} defaultValue={p?.notes} className="input" /></Field>
-      <datalist id="categorias-pagar">{PAYABLE_CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
-      <datalist id="fornecedores">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>
     </div>
   );
 }
@@ -39,27 +42,34 @@ export default async function PagarPage({ searchParams }: { searchParams: Promis
   const month = today.slice(0, 7);
   const in7 = new Date(`${today}T12:00:00`); in7.setDate(in7.getDate() + 7);
   const week = in7.toISOString().slice(0, 10);
+  await runPayableSeries(tid); // garante os meses das contas fixas mesmo sem a rotina diaria
+  const per = resolvePeriod(sp, today);
   const f = ['avencer', 'vencidas', 'pagas', 'canceladas'].includes(sp.situacao ?? '') ? sp.situacao! : '';
   const { page, size, skip, take } = pageParams(sp);
   const where = {
     tenantId: tid,
     ...(f === 'avencer' ? { status: 'aberta', dueDate: { gte: today } } : f === 'vencidas' ? { status: 'aberta', dueDate: { lt: today } } : f === 'pagas' ? { status: 'paga' } : f === 'canceladas' ? { status: 'cancelada' } : { status: { not: 'cancelada' } }),
     ...(sp.q ? { OR: [{ description: like(sp.q) }, { supplier: like(sp.q) }, { category: like(sp.q) }] } : {}),
-    ...(sp.mes && /^\d{4}-\d{2}$/.test(sp.mes) ? { dueDate: { gte: `${sp.mes}-01`, lte: `${sp.mes}-31` } } : {}),
   };
+  if (per.de && per.ate) {
+    const d = (where as { dueDate?: { gte?: string; lt?: string } }).dueDate ?? {};
+    Object.assign(where, { dueDate: { ...d, gte: d.gte && d.gte > per.de ? d.gte : per.de, lte: per.ate } });
+  }
   const sum = (w: object) => db.payable.aggregate({ where: { tenantId: tid, ...w }, _sum: { amountCents: true, paidCents: true }, _count: true });
-  const [rows, total, late, next7, monthOpen, paidMonth, accounts, sup] = await Promise.all([
-    db.payable.findMany({ where, orderBy: [{ dueDate: f === 'pagas' ? 'desc' : 'asc' }], skip, take, include: { account: { select: { name: true } } } }),
+  const [rows, total, late, next7, monthOpen, paidMonth, accounts] = await Promise.all([
+    db.payable.findMany({ where, orderBy: [{ dueDate: f === 'pagas' ? 'desc' : 'asc' }], skip, take, include: { account: { select: { name: true } }, series: { select: { id: true, status: true, dueDay: true, startMonth: true, description: true, supplier: true, category: true, amountCents: true } } } }),
     db.payable.count({ where }),
     sum({ status: 'aberta', dueDate: { lt: today } }),
     sum({ status: 'aberta', dueDate: { gte: today, lte: week } }),
     sum({ status: 'aberta', dueDate: { gte: `${month}-01`, lte: `${month}-31` } }),
     sum({ status: 'paga', paidAt: { gte: `${month}-01`, lte: `${month}-31` } }),
     db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] }),
-    db.payable.findMany({ where: { tenantId: tid, supplier: { not: null } }, distinct: ['supplier'], select: { supplier: true }, take: 200 }),
   ]);
-  const suppliers = sup.map((s) => s.supplier!).sort();
+  const [oDesc, oSup, oCat] = await Promise.all([optionsFor(tid, 'despesa'), optionsFor(tid, 'fornecedor'), optionsFor(tid, 'categoria')]);
+  const opts: Opts = { desc: oDesc, sup: oSup, cat: oCat };
   const filters: [string, string][] = [['', 'Todas'], ['avencer', 'A vencer'], ['vencidas', 'Vencidas'], ['pagas', 'Pagas'], ['canceladas', 'Canceladas']];
+  const keep = { situacao: f || undefined, q: sp.q };
+  const fixed = await db.payableSeries.count({ where: { tenantId: tid, status: 'ativa' } });
   const kpi = (label: string, v: { _sum: { amountCents: number | null; paidCents: number | null }; _count: number }, color: string, hint: string, paid = false) => (
     <div className="card p-4"><p className={`label ${color}`}>{label}</p><p className={`text-2xl font-black tabular-nums ${color}`}>{fmtMoney((paid ? v._sum.paidCents : v._sum.amountCents) ?? 0)}</p><p className="text-xs text-ink-400">{v._count} conta(s) · {hint}</p></div>
   );
@@ -68,8 +78,10 @@ export default async function PagarPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader title="Contas a pagar" crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Contas a pagar' }]}>
         <Link href="/caixa" className="btn-ghost">Caixa e contas</Link>
-        <Modal trigger={<><Plus size={16} /> Nova conta a pagar</>} title="Nova conta a pagar" wide><ActionForm action={savePayable}><PayableFields today={today} suppliers={suppliers} /></ActionForm></Modal>
+        <Modal trigger={<><Plus size={16} /> Nova conta a pagar</>} title="Nova conta a pagar" wide><ActionForm action={savePayable}><PayableFields today={today} opts={opts} /></ActionForm></Modal>
       </PageHeader>
+      <PeriodBar base="/pagar" p={per} keep={keep} />
+      {fixed > 0 && <p className="mb-3 text-xs text-ink-400">{fixed} conta(s) fixa(s) mensal(is) ativa(s): o sistema mantém 12 meses lançados à frente e lança mais um no último dia de cada mês.</p>}
       {accounts.length === 0 && <p className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Para registrar pagamentos, cadastre antes o caixa e as contas bancárias em <Link href="/caixa" className="font-semibold underline">Caixa e contas</Link>.</p>}
       <div className="mb-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpi('Vencidas', late, 'text-red-600', 'em atraso')}
@@ -79,12 +91,12 @@ export default async function PagarPage({ searchParams }: { searchParams: Promis
       </div>
       <div className="card overflow-hidden">
         <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">
-          {filters.map(([k, l]) => <Link key={k} href={k ? `/pagar?situacao=${k}` : '/pagar'} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${f === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{l}</Link>)}
+          {filters.map(([k, l]) => <Link key={k} href={periodHref('/pagar', per, { q: sp.q, situacao: k || undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${f === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{l}</Link>)}
         </div>
         <form className="flex flex-wrap gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
           {f && <input type="hidden" name="situacao" value={f} />}
           <input name="q" defaultValue={sp.q} placeholder="Descrição, fornecedor ou categoria..." aria-label="Buscar" className="input w-72" />
-          <input type="month" name="mes" defaultValue={sp.mes} aria-label="Mês do vencimento" className="input w-44" />
+          {Object.entries(per.params).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <button className="btn-ghost">Filtrar</button>
         </form>
         {rows.length === 0 ? <Empty title="Nenhuma conta a pagar" text="Lance aluguel, internet, comissões e outras despesas para controlar o que vence e o que já foi pago." /> : (
@@ -97,7 +109,7 @@ export default async function PagarPage({ searchParams }: { searchParams: Promis
                   return (
                     <tr key={p.id} className={`border-t border-ink-100 dark:border-ink-700 ${p.status === 'cancelada' ? 'opacity-60' : ''}`}>
                       <td className={`td whitespace-nowrap ${overdue ? 'font-semibold text-red-600' : ''}`}>{fmtDate(p.dueDate)}</td>
-                      <td className="td"><span className="font-medium">{p.description}</span>{p.installments && <span className="ml-1 text-xs text-ink-400">({p.installment}/{p.installments})</span>}<span className="block text-xs text-ink-400">{p.supplier}</span></td>
+                      <td className="td"><span className="font-medium">{p.description}</span>{p.installments && <span className="ml-1 text-xs text-ink-400">({p.installment}/{p.installments})</span>}{p.series && <span className={`badge ml-2 ${p.series.status === 'ativa' ? 'bg-violet-100 text-violet-700' : 'bg-ink-100 text-ink-500'}`}>{p.series.status === 'ativa' ? 'Fixa mensal' : 'Recorrência cancelada'}</span>}<span className="block text-xs text-ink-400">{p.supplier}</span></td>
                       <td className="td text-ink-500">{p.category}</td>
                       <td className="td text-right font-semibold tabular-nums">{fmtMoney(p.amountCents)}</td>
                       <td className="td">
@@ -117,12 +129,32 @@ export default async function PagarPage({ searchParams }: { searchParams: Promis
                                 </div>
                               </ActionForm>
                             </Modal>
-                            <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar" title="Editar conta a pagar" wide><ActionForm action={savePayable}><PayableFields p={p} today={today} suppliers={suppliers} /></ActionForm></Modal>
+                            <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar" title="Editar conta a pagar" wide><ActionForm action={savePayable}><PayableFields p={p} today={today} opts={opts} /></ActionForm></Modal>
                             <Modal trigger={<Ban size={15} />} triggerClass="btn-icon" titleAttr="Cancelar" title={`Cancelar — ${p.description}?`}>
                               <ActionForm action={cancelPayable} submit="Sim, cancelar" submitClass="btn-primary !bg-red-600">
                                 <input type="hidden" name="id" value={p.id} />
                                 <p className="text-sm text-ink-500">A conta deixa de contar como valor a pagar.</p>
                                 {p.groupId && <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="series" className="h-4 w-4" /> Cancelar também as próximas desta série mensal</label>}
+                              </ActionForm>
+                            </Modal>
+                          </>}
+                          {p.series?.status === 'ativa' && <>
+                            <Modal trigger={<Repeat size={15} />} triggerClass="btn-icon" titleAttr="Editar recorrência" title="Editar conta fixa mensal" wide>
+                              <ActionForm action={updatePayableSeries}>
+                                <input type="hidden" name="id" value={p.series.id} />
+                                <p className="text-sm text-ink-500">Vale para esta e todas as próximas contas em aberto desta recorrência ({seriesLabel(p.series)}).</p>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <Field label="Descrição" className="sm:col-span-2"><input name="description" required defaultValue={p.series.description} className="input" /></Field>
+                                  <Field label="Fornecedor" group><OptionInput name="supplier" kind="fornecedor" label="Fornecedor" options={opts.sup} defaultValue={p.series.supplier} /></Field>
+                                  <Field label="Categoria" group><OptionInput name="category" kind="categoria" label="Categoria" options={opts.cat} defaultValue={p.series.category} /></Field>
+                                  <Field label="Valor mensal"><MoneyInput name="amount" defaultCents={p.series.amountCents} required /></Field>
+                                </div>
+                              </ActionForm>
+                            </Modal>
+                            <Modal trigger={<Repeat size={15} />} triggerClass="btn-icon !text-red-600" titleAttr="Cancelar recorrência" title="Cancelar a conta fixa mensal?">
+                              <ActionForm action={cancelPayableSeries} submit="Cancelar recorrência" submitClass="btn-danger" cancel>
+                                <input type="hidden" name="id" value={p.series.id} />
+                                <p className="text-sm text-ink-500"><b>{p.series.description}</b> deixa de ser lançada e <b>todas as contas futuras em aberto</b> dela são canceladas. As pagas e as vencidas continuam na lista.</p>
                               </ActionForm>
                             </Modal>
                           </>}

@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { SIGN_LABEL } from '@/lib/contract-sign';
-import { Ban, Pencil, FileSignature, FileText, Repeat, Search, ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react';
+import { Ban, Pencil, FileSignature, FileText, Repeat, Search } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { localDate } from '@/lib/util';
 import { fmtDate, fmtMoney } from '@/lib/money';
-import { addMonths, bankOf, competenceLabel, invoiceItems, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
+import { bankOf, competenceLabel, invoiceItems, invoiceState, METHODS, runRecurring, STATE_LABEL, SUB_MODE } from '@/lib/billing';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionForm, Field, Modal } from '@/components/ui';
 import { cancelCharge, updateCharge } from './actions';
@@ -13,6 +13,8 @@ import { InvoiceItems } from '@/components/InvoiceItems';
 import { MoneyInput } from '@/components/MoneyInput';
 import { InvoiceActions } from '@/components/InvoiceActions';
 import { FinanceButtons } from '@/components/FinanceButtons';
+import { PeriodBar } from '@/components/PeriodBar';
+import { periodHref, resolvePeriod } from '@/lib/period';
 
 // a geracao de contrato com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
@@ -28,24 +30,15 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   await runRecurring(tid); // garante as faturas recorrentes do mes mesmo sem a rotina diaria
   const tab = sp.aba === 'recorrencias' || sp.aba === 'contratos' ? sp.aba : 'faturas';
   const today = localDate();
-  const month = today.slice(0, 7);
   const { page, size, skip, take } = pageParams(sp);
   const status = sp.situacao;
   const accounts = await db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true } });
   const operations = await db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
   // periodo de consulta: um mes (padrao: o atual), um intervalo personalizado ou todo o periodo
-  const D = /^\d{4}-\d{2}-\d{2}$/;
-  const all = sp.mes === 'todos';
-  const custom = !all && (D.test(sp.de ?? '') || D.test(sp.ate ?? ''));
-  const mes = !all && !custom && /^\d{4}-\d{2}$/.test(sp.mes ?? '') ? sp.mes! : month;
-  const lastDay = (ym: string) => `${ym}-${String(new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate()).padStart(2, '0')}`;
-  const de = all ? null : custom ? (D.test(sp.de ?? '') ? sp.de! : '2000-01-01') : `${mes}-01`;
-  const ate = all ? null : custom ? (D.test(sp.ate ?? '') ? sp.ate! : '2100-12-31') : lastDay(mes);
-  const inPeriod = de && ate ? { dueDate: { gte: de, lte: ate } } : {};
-  const paidPeriod = de && ate ? { paidAt: { gte: new Date(`${de}T00:00:00-03:00`), lte: new Date(`${ate}T23:59:59-03:00`) } } : {};
-  const periodParams: Record<string, string> = all ? { mes: 'todos' } : custom ? { ...(sp.de ? { de: sp.de } : {}), ...(sp.ate ? { ate: sp.ate } : {}) } : mes === month ? {} : { mes };
-  const qs = (extra: Record<string, string | undefined>) => { const q = new URLSearchParams(); for (const [k, v] of Object.entries({ ...periodParams, ...extra })) if (v) q.set(k, v); const t = q.toString(); return t ? `/financeiro?${t}` : '/financeiro'; };
-  const monthName = (ym: string) => { const t = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${ym}-15T12:00:00Z`)); return t[0].toUpperCase() + t.slice(1); };
+  const per = resolvePeriod(sp, today);
+  const { de, ate } = per;
+  const paidPeriod = per.paidAt ? { paidAt: per.paidAt } : {};
+  const qs = (extra: Record<string, string | undefined>) => periodHref('/financeiro', per, extra);
   const where = {
     tenantId: tid,
     ...(status === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : status === 'aberta' ? { status: 'aberta', dueDate: { gte: today } } : status === 'paga' || status === 'cancelada' ? { status } : { status: { not: 'cancelada' } }), // canceladas ficam no arquivo morto
@@ -89,24 +82,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
 
       {noPix && <p className="mb-4 rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-800 dark:text-ink-200">Cadastre sua chave Pix em <Link href="/empresa#cobranca" className="font-semibold underline">Minha empresa</Link> para que as faturas saiam com QR Code de pagamento.</p>}
 
-      <div className="card mb-4 flex flex-wrap items-center gap-2 p-3">
-        <span className="label mr-1">Período</span>
-        {!all && !custom && <Link href={qs({ mes: addMonths(mes, -1) })} className="btn-icon" aria-label="Mês anterior" title="Mês anterior"><ChevronLeft size={16} /></Link>}
-        <span className="min-w-40 text-center font-bold">{all ? 'Todo o período' : custom ? `${fmtDate(de)} a ${fmtDate(ate)}` : monthName(mes)}</span>
-        {!all && !custom && <Link href={qs({ mes: addMonths(mes, 1) })} className="btn-icon" aria-label="Próximo mês" title="Próximo mês"><ChevronRight size={16} /></Link>}
-        <form className="flex items-center gap-1" action="/financeiro">
-          <input type="month" name="mes" defaultValue={!all && !custom ? mes : ''} aria-label="Escolher mês" className="input !py-1.5" />
-          <button className="btn-ghost !py-1.5">Ir</button>
-        </form>
-        <Modal trigger={<><CalendarRange size={15} /> Período personalizado</>} triggerClass="btn-ghost !py-1.5" title="Período personalizado">
-          <form action="/financeiro" className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2"><Field label="De"><input type="date" name="de" required defaultValue={de ?? ''} className="input" /></Field><Field label="Até"><input type="date" name="ate" required defaultValue={ate ?? ''} className="input" /></Field></div>
-            <div className="flex justify-end"><button className="btn-primary">Aplicar</button></div>
-          </form>
-        </Modal>
-        {(all || custom || mes !== month) && <Link href="/financeiro" className="btn-ghost !py-1.5">Mês atual</Link>}
-        {!all && <Link href="/financeiro?mes=todos" className="btn-ghost !py-1.5">Todo o período</Link>}
-      </div>
+      <PeriodBar base="/financeiro" p={per} />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <div className="card p-4"><p className="text-xs font-semibold uppercase text-ink-400">A receber{de ? ' no período' : ''}</p><p className="text-2xl font-black tabular-nums">{fmtMoney(open._sum.amountCents)}</p><p className="text-xs text-ink-400">{open._count} fatura(s) no prazo</p></div>
@@ -193,7 +169,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
         </div>
         <form className="flex flex-wrap items-end gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
           {status && <input type="hidden" name="situacao" value={status} />}
-          {Object.entries(periodParams).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+          {Object.entries(per.params).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <input name="cliente" defaultValue={sp.cliente} placeholder="Cliente ou parceiro..." className="input w-56" aria-label="Cliente ou parceiro" />
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>
         </form>

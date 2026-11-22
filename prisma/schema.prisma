@@ -59,6 +59,8 @@ model Tenant {
   bankAccounts BankAccount[]
   cashEntries  CashEntry[]
   payables     Payable[]
+  payableSeries PayableSeries[]
+  savedOptions SavedOption[]
   screens    Screen[]
   clients    Client[]
   medias     Media[]
@@ -501,7 +503,41 @@ model Payable {
   groupId      String?
   installment  Int?
   installments Int?
+  seriesId     String?        // despesa fixa mensal (recorrente)
+  series       PayableSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  competence   String?        // AAAA-MM da recorrencia
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   @@index([tenantId, status, dueDate])
+  @@unique([seriesId, competence])
+}
+
+// Despesa fixa mensal (aluguel, internet...): mantem 12 contas lancadas a frente ate ser cancelada.
+model PayableSeries {
+  id          String    @id @default(uuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  description String
+  supplier    String?
+  category    String    @default("Outros")
+  amountCents Int
+  dueDay      Int       // 1 a 31 (meses menores usam o ultimo dia)
+  startMonth  String    // AAAA-MM
+  notes       String    @default("")
+  status      String    @default("ativa") // ativa | cancelada
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  payables    Payable[]
+  @@index([tenantId, status])
+}
+
+// Opcoes cadastradas pelo botao + dos campos (descricoes de lancamento, categorias, fornecedores...).
+model SavedOption {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  kind      String   // lancamento | despesa | categoria | fornecedor
+  value     String
+  createdAt DateTime @default(now())
+  @@unique([tenantId, kind, value])
 }
