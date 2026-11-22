@@ -108,11 +108,11 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
           {(f.cliente || f.operacao) && <Link href={periodHref('/receber', per, { situacao: f.situacao || undefined, por })} className="btn-ghost">Limpar</Link>}
         </form>
         {list.length === 0 ? <Empty title="Nenhum débito em aberto" text="Todos os clientes estão em dia com os filtros escolhidos." /> : (
-          <ul className="divide-y divide-ink-100 dark:divide-ink-700">
+          <ul className="space-y-4 p-3 sm:p-4">
             {list.map((g) => (
-              <li key={g.client.id}>
+              <li key={g.client.id} className="overflow-hidden rounded-xl border-[3px] border-brand-500 bg-white shadow-sm dark:border-brand-400 dark:bg-ink-800">
                 <details className="group" open>
-                  <summary className="flex cursor-pointer flex-wrap items-center gap-3 p-4 hover:bg-ink-50 dark:hover:bg-ink-700/40">
+                  <summary className="flex cursor-pointer flex-wrap items-center gap-3 bg-brand-50 p-4 hover:bg-brand-100 dark:bg-ink-900 dark:hover:bg-ink-700/40">
                     <ChevronDown size={16} className="shrink-0 -rotate-90 text-ink-400 transition-transform group-open:rotate-0" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold">{g.client.tradeName || g.client.name}</span>
@@ -125,7 +125,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
                     <span className="w-32 text-right font-black tabular-nums">{fmtMoney(g.overdueCents + g.openCents + g.paidCents + g.otherCents)}</span>
                     {g.overdueCents + g.openCents > 0 && <a href={wa(g)} target="_blank" rel="noreferrer" className="btn bg-emerald-600 !py-1.5 text-white hover:bg-emerald-500" title="Cobrar pelo WhatsApp"><MessageCircle size={15} /> Cobrar</a>}
                   </summary>
-                  <table className="mb-3 w-full text-sm">
+                  <table className="mb-3 hidden w-full text-sm md:table">
                     <thead><tr className="text-left"><th className="th pl-8">Fatura</th><th className="th">Referência</th><th className="th">Vencimento</th><th className="th">Atraso / situação</th><th className="th text-right">Valor</th><th className="th text-right">Ações</th></tr></thead>
                     <tbody>
                       {g.items.map((i) => (
@@ -140,6 +140,22 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
                       ))}
                     </tbody>
                   </table>
+                  {/* celular: uma fatura por bloco */}
+                  <ul className="divide-y divide-ink-100 md:hidden dark:divide-ink-700">
+                    {g.items.map((i) => (
+                      <li key={i.id} className="space-y-2 p-3 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold">Fatura <span className="font-mono">{String(i.number).padStart(6, '0')}</span> · {i.ref}</p>
+                            {i.operation && <p className="text-xs text-ink-400">{i.operation}</p>}
+                            <p className={`text-xs ${i.late ? 'font-semibold text-red-600' : 'text-ink-500'}`}>Vence {fmtDate(i.dueDate)}{i.late ? ` · ${i.late} dia(s) de atraso` : ''}{i.state === 'paga' ? ' · paga' : i.state === 'cancelada' ? ' · cancelada' : ''}</p>
+                          </div>
+                          <p className="shrink-0 font-black tabular-nums">{fmtMoney(i.amountCents)}</p>
+                        </div>
+                        <InvoiceActions inv={i.inv} today={today} accounts={accounts} services={services} hasBank={hasBank} />
+                      </li>
+                    ))}
+                  </ul>
                 </details>
               </li>
             ))}

@@ -70,7 +70,11 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center justify-between bg-ink-900 px-4 py-3 lg:hidden">
-        <Logo />
+        {company.logo && company.brand
+          ? <img src={company.logo} alt={company.name} className="h-10 w-auto max-w-[160px] object-contain" /> /* eslint-disable-line @next/next/no-img-element */
+          : company.logo
+          ? <span className="flex items-center gap-2"><img src={company.logo} alt="" className="h-9 w-9 rounded-lg bg-white object-contain p-0.5" /><span className="truncate text-sm font-bold text-white">{company.name}</span></span> /* eslint-disable-line @next/next/no-img-element */
+          : <Logo />}
         <button className={tool} aria-label="Abrir menu" onClick={() => setOpen(true)}><Menu size={20} /></button>
       </header>
       {open && <div className="fixed inset-0 z-30 bg-ink-950/60 lg:hidden" onClick={() => setOpen(false)} />}
