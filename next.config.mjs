@@ -11,7 +11,10 @@ const nextConfig = {
   poweredByHeader: false,
   experimental: { serverActions: { bodySizeLimit: '300mb' } },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      { source: '/download/:file*.apk', headers: [{ key: 'Content-Type', value: 'application/vnd.android.package-archive' }, { key: 'Content-Disposition', value: 'attachment; filename="YesDoohPlayer.apk"' }] },
+    ];
   },
 };
 export default nextConfig;

@@ -41,6 +41,8 @@ import android.widget.TextView;
  */
 public class MainActivity extends Activity {
     private static final String PREFS = "yesdooh";
+    /** Servidor padrao (painel em producao); pode ser trocado na configuracao. */
+    private static final String DEFAULT_SERVER = "https://yesdooh.vercel.app";
     private static final String KEY_URL = "server";
     private static final String KEY_ROTATE = "rotate";
     private static final String[] ROTATIONS = {"0", "90", "180", "270"};
@@ -163,12 +165,12 @@ public class MainActivity extends Activity {
         box.setPadding(pad, pad / 2, pad, 0);
 
         TextView l1 = new TextView(this);
-        l1.setText("Endereço do servidor (ex.: https://painel.suaempresa.com.br)");
+        l1.setText("Endereço do servidor (já vem preenchido com o da Yes; troque só se usar outro)");
         EditText url = new EditText(this);
         url.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         url.setSingleLine(true);
         url.setHint("https://");
-        url.setText(prefs.getString(KEY_URL, ""));
+        url.setText(prefs.getString(KEY_URL, DEFAULT_SERVER));
 
         TextView l2 = new TextView(this);
         l2.setText("Girar a imagem (para TV instalada na vertical)");
