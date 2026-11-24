@@ -15,14 +15,14 @@ export default async function AppPage() {
     ['Permita a instalação', 'Ao abrir o arquivo, o Android pede para permitir “fontes desconhecidas” (ou “instalar apps desconhecidos”) para o navegador ou gerenciador de arquivos. Permita e instale.'],
     ['Abra o Yes DOOH Player', 'O endereço do servidor já vem preenchido (yesdooh.vercel.app). Toque em Salvar.'],
     ['Pareie a tela', 'No painel, entre em Minhas telas → abra a tela (ou crie em “Nova tela”) e veja o código de pareamento. Digite esse código na TV, com o controle. Em segundos a programação começa a rodar.'],
-    ['Ligar junto com o aparelho', 'No app, abra o menu (tecla MENU do controle ou VOLTAR cinco vezes) e escolha “Definir como tela inicial do aparelho”.'],
+    ['Abrir sozinho ao ligar o box', 'Na primeira abertura, o app pede uma liberação do Android. Escolha “Tela inicial” (recomendado: o box liga direto no player) ou “Sobrepor apps” e ative para o Yes DOOH Player. Sem isso, no Android 10 ou mais novo o box fica parado na tela dele depois de reiniciar. Para conferir depois: menu do app (tecla MENU ou VOLTAR cinco vezes) → “Abrir ao ligar o aparelho”.'],
   ];
   return (
     <main className="min-h-screen bg-[#f6f3fb] px-4 py-8 text-[#1d1029]">
       <div className="mx-auto max-w-2xl space-y-6">
         <header className="flex items-center gap-3">
           <img src="/brand/yes.png" alt="Yes" className="h-12 w-auto" />{/* eslint-disable-line @next/next/no-img-element */}
-          <div><h1 className="text-2xl font-black">Yes DOOH Player</h1><p className="text-sm text-gray-500">App para TV box, Android TV e Fire TV · Android 5.0 ou superior · versão 1.2</p></div>
+          <div><h1 className="text-2xl font-black">Yes DOOH Player</h1><p className="text-sm text-gray-500">App para TV box, Android TV e Fire TV · Android 5.0 ou superior · versão 1.3</p></div>
         </header>
         <section className="flex flex-wrap items-center gap-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
           <img src={qr} alt="QR Code para baixar o app" className="h-40 w-40" />{/* eslint-disable-line @next/next/no-img-element */}

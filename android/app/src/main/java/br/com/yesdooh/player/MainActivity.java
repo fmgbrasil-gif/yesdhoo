@@ -54,6 +54,8 @@ public class MainActivity extends Activity {
     private SharedPreferences prefs;
     private FrameLayout root;
     private WebView web;
+    /** O player esta na frente (evita reabrir sem necessidade nas tentativas do boot). */
+    static volatile boolean visible;
     private TextView status;
     private boolean failed;
     private int backCount;
@@ -77,7 +79,57 @@ public class MainActivity extends Activity {
         createWebView();
         root.addView(status, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        if (prefs.getString(KEY_URL, "").isEmpty()) showSetup(); else loadPlayer();
+        if (prefs.getString(KEY_URL, "").isEmpty()) showSetup(); else { loadPlayer(); checkAutostart(false); }
+    }
+
+    /** No Android 10+ o app so abre sozinho ao ligar se for a tela inicial ou puder "sobrepor a outros apps". */
+    private boolean autostartReady() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true;
+        return isDefaultHome() || Settings.canDrawOverlays(this);
+    }
+
+    private boolean isDefaultHome() {
+        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        android.content.pm.ResolveInfo r = getPackageManager().resolveActivity(home, 0);
+        return r != null && r.activityInfo != null && getPackageName().equals(r.activityInfo.packageName);
+    }
+
+    /** Guia para liberar a abertura automatica (na primeira vez e pelo menu). */
+    private void checkAutostart(boolean fromMenu) {
+        if (autostartReady()) {
+            if (fromMenu) new AlertDialog.Builder(this).setTitle("Abrir ao ligar o aparelho").setMessage("Tudo certo: o player abre sozinho quando o aparelho liga." + (isDefaultHome() ? "\n\n(O player é a tela inicial do aparelho.)" : "")).setPositiveButton("OK", null).show();
+            return;
+        }
+        if (!fromMenu && prefs.getBoolean("autostartAsked", false)) return;
+        prefs.edit().putBoolean("autostartAsked", true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle("Abrir sozinho ao ligar o aparelho")
+                .setMessage("Para o player abrir sozinho quando o TV box for ligado ou reiniciado, o Android precisa de uma destas liberações:\n\n"
+                        + "1) Definir o Yes DOOH Player como TELA INICIAL (recomendado para box dedicado à TV).\n\n"
+                        + "2) Permitir \"Sobrepor a outros apps\" / \"Exibir sobre outros apps\" para o Yes DOOH Player.\n\n"
+                        + "Depois, volte para o player.")
+                .setPositiveButton("Tela inicial", (d, w) -> setAsHome())
+                .setNeutralButton("Sobrepor apps", (d, w) -> allowOverlay())
+                .setNegativeButton("Agora não", null)
+                .show();
+    }
+
+    private void setAsHome() {
+        try {
+            startActivity(new Intent(Settings.ACTION_HOME_SETTINGS));
+        } catch (Exception e) {
+            // sem a tela de "app de inicio": abre o seletor de tela inicial (escolha Yes DOOH Player e "Sempre")
+            open(new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        }
+    }
+
+    private void allowOverlay() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+        try {
+            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            open(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -205,12 +257,14 @@ public class MainActivity extends Activity {
                     }
                     prefs.edit().putString(KEY_URL, value).putString(KEY_ROTATE, ROTATIONS[rotate.getSelectedItemPosition()]).apply();
                     loadPlayer();
+                    checkAutostart(false);
                 })
                 .show();
     }
 
     private void showMenu() {
-        String[] items = {"Recarregar", "Configurar servidor e rotação", "Desparear e limpar dados", "Definir como tela inicial do aparelho", "Permitir abrir ao ligar o aparelho", "Sair do player"};
+        String auto = autostartReady() ? "Abrir ao ligar o aparelho: LIBERADO ✓" : "Abrir ao ligar o aparelho: NÃO LIBERADO — configurar";
+        String[] items = {"Recarregar", "Configurar servidor e rotação", "Desparear e limpar dados", "Definir como tela inicial do aparelho", "Permitir sobrepor a outros apps", auto, "Sair do player"};
         new AlertDialog.Builder(this).setTitle("Yes DOOH Player " + appVersion()).setItems(items, (d, which) -> {
             switch (which) {
                 case 0: loadPlayer(); break;
@@ -221,11 +275,9 @@ public class MainActivity extends Activity {
                     web.clearCache(true);
                     loadPlayer();
                     break;
-                case 3: open(new Intent(Settings.ACTION_HOME_SETTINGS)); break;
-                case 4:
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                        open(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
-                    break;
+                case 3: setAsHome(); break;
+                case 4: allowOverlay(); break;
+                case 5: checkAutostart(true); break;
                 default: finish();
             }
         }).show();
@@ -273,12 +325,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        visible = true;
         web.onResume();
         hideSystemBars();
     }
 
     @Override
     protected void onPause() {
+        visible = false;
         web.onPause();
         super.onPause();
     }

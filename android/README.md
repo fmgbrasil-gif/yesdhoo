@@ -12,13 +12,15 @@ Funciona com as duas retaguardas deste repositório (Node e PHP), pois ambas usa
 
 ## Instalar no box
 
-1. Copie `dist/YesDoohPlayer-1.2-teste.apk` para o aparelho (pendrive ou download) e instale, permitindo "fontes desconhecidas".
+1. Copie `dist/YesDoohPlayer-1.3-teste.apk` para o aparelho (pendrive ou download) e instale, permitindo "fontes desconhecidas".
 2. Abra o app e informe o **endereço do servidor**:
    - retaguarda Node: `https://painel.suaempresa.com.br`
    - retaguarda PHP: `https://seusite.com.br/yesdooh` (ou o endereço completo terminando em `player.php`)
 3. Digite o **código de pareamento** que aparece no painel, na página da tela.
-4. Para ligar junto com o aparelho, abra o menu do app e escolha **Definir como tela inicial do aparelho**
-   (mais confiável) ou **Permitir abrir ao ligar o aparelho**.
+4. Para abrir sozinho ao ligar ou reiniciar o box, aceite o pedido que o app faz na primeira abertura:
+   **Tela inicial** (mais confiável) ou **Sobrepor apps**. No Android 10+ sem uma dessas liberações o sistema
+   bloqueia a abertura automática. O app também tenta abrir de novo 10 s, 25 s, 45 s e 90 s depois de ligar,
+   porque muitos box terminam de carregar a tela deles depois. Menu → "Abrir ao ligar o aparelho" mostra a situação.
 
 **Menu do app:** tecla `MENU` do controle, ou `VOLTAR` cinco vezes seguidas. Nele dá para recarregar, trocar o
 servidor, girar a imagem (TV na vertical), desparear e sair.
