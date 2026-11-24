@@ -13,6 +13,7 @@ import { fmtDate, fmtMoney } from '@/lib/money';
 
 import { readClientDocs, type ClientDraft } from '@/lib/ai-client';
 import { basicContract } from '@/lib/contract-template';
+import { parseKind } from '@/lib/client-kind';
 
 type Fail = { ok: false; error: string };
 export type WizardClient = { id: string; name: string; kind: string };
@@ -37,7 +38,7 @@ export async function wizardSaveClient(fd: FormData): Promise<Fail | { ok: true;
   if (!name) return { ok: false, error: 'Informe o nome ou a razão social do cliente.' };
   const document = str(fd, 'document')?.replace(/\D/g, '') || null;
   const data = {
-    kind: fd.get('kind') === 'parceiro' ? 'parceiro' : 'cliente', type: fd.get('type') === 'PF' ? 'PF' : 'PJ', name,
+    kind: parseKind(fd.get('kind')), type: fd.get('type') === 'PF' ? 'PF' : 'PJ', name,
     tradeName: str(fd, 'tradeName'), document, stateRegistration: str(fd, 'stateRegistration'), email: str(fd, 'email'), phone1: str(fd, 'phone1'),
     road: str(fd, 'road'), number: str(fd, 'number'), complement: str(fd, 'complement'), neighborhood: str(fd, 'neighborhood'),
     zipcode: str(fd, 'zipcode'), city: str(fd, 'city'), state: str(fd, 'state'),

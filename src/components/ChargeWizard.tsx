@@ -45,9 +45,10 @@ function ClientFields({ d }: { d: Partial<ClientDraft> }) {
   return (
     <div className="grid gap-3 sm:grid-cols-6">
       <Field label="Tipo de cadastro" className="sm:col-span-3">
-        <div className="flex gap-4 pt-2 text-sm">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-sm">
           <label className="flex items-center gap-2"><input type="radio" name="kind" value="cliente" defaultChecked className="accent-violet-500" /> Cliente (anunciante)</label>
           <label className="flex items-center gap-2"><input type="radio" name="kind" value="parceiro" className="accent-violet-500" /> Parceiro (ponto)</label>
+          <label className="flex items-center gap-2"><input type="radio" name="kind" value="cortesia" className="accent-violet-500" /> Cortesia (sem custo mensal)</label>
         </div>
       </Field>
       <Field label="Pessoa" className="sm:col-span-3"><select name="type" defaultValue={d.type ?? 'PJ'} className="input"><option value="PJ">Jurídica</option><option value="PF">Física</option></select></Field>
@@ -280,7 +281,21 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
         </div>
       )}
 
-      {step === 1 && client && !charge && (
+      {step === 1 && client && !charge && client.kind === 'cortesia' && (
+        <div className="space-y-4">
+          <h2 className="flex items-center gap-2 text-lg font-bold"><Receipt size={18} /> Cortesia</h2>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"><b>{client.name}</b> está cadastrado como <b>cortesia (sem custo mensal)</b>. Não é gerada cobrança, fatura nem Pix. Agora é só cadastrar a mídia e escolher as telas onde ela vai passar.</p>
+          <div className="flex flex-wrap justify-between gap-2">
+            {back(0)}
+            <span className="flex flex-wrap gap-2">
+              <a href="/clientes?tipo=cortesia" className="btn-ghost">Ver cortesias</a>
+              <a href="/midias" className="btn-primary">Cadastrar a mídia</a>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {step === 1 && client && !charge && client.kind !== 'cortesia' && (
         <form onSubmit={submitCharge} className="space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-bold"><Receipt size={18} /> Cobrança</h2>
           <ChargeFields clients={clients} today={today} services={services} fixedClient={client} operations={ops} accounts={accounts} defaultOperationId={opId || null} />
