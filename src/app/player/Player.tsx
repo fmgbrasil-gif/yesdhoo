@@ -85,11 +85,23 @@ export function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: st
   useEffect(() => {
     if (!needsData) return;
     let dead = false;
+    // sem internet (ou fonte fora do ar), usa a ultima versao baixada por ate 2 dias
+    const key = `yd-widget:${media.id}`;
+    const isEmpty = (j: Record<string, unknown> | null) => !j || (media.type === 'rss' ? !(j.items as unknown[] | undefined)?.length : media.type === 'dolar' ? typeof j.value !== 'number' : typeof j.temp !== 'number');
+    const fallback = () => {
+      if (dead) return;
+      try {
+        const saved = JSON.parse(localStorage.getItem(key) ?? 'null') as { t: number; j: Record<string, unknown> } | null;
+        if (saved && Date.now() - saved.t < 48 * 3600_000 && !isEmpty(saved.j)) { setData(saved.j); return; }
+      } catch { /* copia invalida */ }
+      skip();
+    };
     api(`/api/player/widget?kind=${media.type}&id=${media.id}`).then((r) => r.json()).then((j) => {
       if (dead) return;
-      const empty = media.type === 'rss' ? !j.items?.length : media.type === 'dolar' ? typeof j.value !== 'number' : typeof j.temp !== 'number';
-      if (empty) skip(); else setData(j); // sem dados (offline ou fonte fora do ar): pula o slide
-    }).catch(() => !dead && skip());
+      if (isEmpty(j)) { fallback(); return; }
+      setData(j);
+      try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), j })); } catch { /* sem espaco */ }
+    }).catch(fallback);
     return () => { dead = true; };
   }, [media.id, media.type, needsData, api, skip]);
 
@@ -156,6 +168,12 @@ export function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: st
   );
 }
 
+/** YouTube e sites externos precisam de internet: sem conexao, pula para o proximo conteudo. */
+function OfflineSkip({ next }: { next: () => void }) {
+  useEffect(() => { const t = setTimeout(next, 300); return () => clearTimeout(t); }, [next]);
+  return <div style={{ ...full, background: '#000' }} />;
+}
+
 /** Tela de abertura/carregamento: logo da Yes bem grande e, embaixo, a da Imperium X. */
 function Splash({ text }: { text?: string }) {
   return (
@@ -171,6 +189,7 @@ function Stage({ cur, sync, api, next }: { cur: NonNullable<Current>; sync: Sync
   const { media } = cur;
   const isVideo = media.type === 'arquivo' && media.kind === 'video';
   const src = useCachedSrc(media.type === 'arquivo' ? media.src : null);
+  const offlineNow = typeof navigator !== 'undefined' && !navigator.onLine;
   useEffect(() => {
     // video avanca ao terminar; o temporizador e a rede de seguranca caso ele trave
     const t = setTimeout(next, (media.duration + (isVideo ? 8 : 0)) * 1000);
@@ -184,6 +203,7 @@ function Stage({ cur, sync, api, next }: { cur: NonNullable<Current>; sync: Sync
       ? <video key={cur.n} src={src} poster={BLANK} autoPlay playsInline muted={!sync.screen.audioEnabled} onEnded={next} onError={fail} style={{ ...full, objectFit: 'contain', background: '#000' }} />
       : <img src={src} alt="" onError={fail} style={{ ...full, objectFit: 'contain', background: '#000' }} />; // eslint-disable-line @next/next/no-img-element
   }
+  if ((media.type === 'youtube' || media.type === 'link') && offlineNow) return <OfflineSkip next={next} />;
   if (media.type === 'youtube') {
     const id = youtubeId(media.url ?? '');
     if (!id) return null;
@@ -249,7 +269,16 @@ export default function Player() {
     if (q) localStorage.setItem(LS.rotate, q);
     setRotate(Number(localStorage.getItem(LS.rotate)) || 0);
     // guarda a propria pagina do player para ela abrir mesmo se o aparelho ligar sem internet
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      // guarda ja no primeiro uso a pagina, os scripts e os logos (para abrir sem internet depois de reiniciar)
+      navigator.serviceWorker.ready.then((reg) => {
+        const urls = ['/player', '/brand/yes-white.png', '/brand/imperiumx-white.png',
+          ...Array.from(document.querySelectorAll<HTMLScriptElement>('script[src]')).map((e) => e.src),
+          ...Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"], link[rel="preload"][as="script"], link[rel="modulepreload"]')).map((e) => e.href)];
+        reg.active?.postMessage({ type: 'warm', urls });
+      }).catch(() => {});
+    }
     setToken(localStorage.getItem(LS.token));
     try { const saved = localStorage.getItem(LS.data); if (saved) setSync(JSON.parse(saved)); } catch { /* playlist salva invalida */ }
   }, []);
