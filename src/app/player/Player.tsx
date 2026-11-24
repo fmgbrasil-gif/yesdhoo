@@ -156,6 +156,17 @@ export function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: st
   );
 }
 
+/** Tela de abertura/carregamento: logo da Yes bem grande e, embaixo, a da Imperium X. */
+function Splash({ text }: { text?: string }) {
+  return (
+    <div style={{ ...center, background: '#1b0c30', gap: 'calc(var(--u) * 5)' }}>
+      <img src="/brand/yes-white.png" alt="Yes" style={{ width: 'min(calc(var(--uw) * 55), calc(var(--uh) * 80))', height: 'auto' }} />{/* eslint-disable-line @next/next/no-img-element */}
+      {text && <p style={{ fontSize: 'calc(var(--u) * 3)', opacity: 0.7, color: '#fff' }}>{text}</p>}
+      <img src="/brand/imperiumx-white.png" alt="Imperium X" style={{ position: 'absolute', bottom: 'calc(var(--u) * 5)', width: 'calc(var(--u) * 24)', height: 'auto', opacity: 0.9 }} />{/* eslint-disable-line @next/next/no-img-element */}
+    </div>
+  );
+}
+
 function Stage({ cur, sync, api, next }: { cur: NonNullable<Current>; sync: Sync; api: (p: string) => Promise<Response>; next: () => void }) {
   const { media } = cur;
   const isVideo = media.type === 'arquivo' && media.kind === 'video';
@@ -366,14 +377,11 @@ export default function Player() {
 
   return (
     <div style={frame}>
-      {token === undefined ? null : !token ? <div style={{ position: 'relative', flex: 1 }}><Pairing onPaired={(t) => { localStorage.setItem(LS.token, t); setToken(t); }} /></div> : (
+      {token === undefined ? <div style={{ position: 'relative', flex: 1 }}><Splash /></div> : !token ? <div style={{ position: 'relative', flex: 1 }}><Pairing onPaired={(t) => { localStorage.setItem(LS.token, t); setToken(t); }} /></div> : (
         <>
           <div ref={stage} data-name={cur?.media.name ?? ''} style={{ position: 'relative', flex: 1, minHeight: 0 }}>
             {cur && sync ? <Stage cur={cur} sync={sync} api={api} next={next} /> : (
-              <div style={{ ...center, background: '#1b0c30' }}>
-                <p style={{ fontSize: 'calc(var(--u) * 6)', fontWeight: 900 }}>Yes<span style={{ color: '#b58cff' }}>DOOH</span></p>
-                <p style={{ fontSize: 'calc(var(--u) * 3)', opacity: 0.7 }}>{!sync ? 'Carregando programação...' : sync.slots.length ? 'Nenhum conteúdo programado para este horário.' : `${sync.screen.name}: adicione conteúdos à playlist no painel.`}</p>
-              </div>
+              <Splash text={!sync ? 'Carregando programação...' : sync.slots.length ? 'Nenhum conteúdo programado para este horário.' : `${sync.screen.name}: adicione conteúdos à playlist no painel.`} />
             )}
           </div>
           {footer && sync && (

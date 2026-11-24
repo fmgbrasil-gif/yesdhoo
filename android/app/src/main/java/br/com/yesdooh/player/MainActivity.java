@@ -33,6 +33,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 /**
@@ -57,6 +58,8 @@ public class MainActivity extends Activity {
     /** O player esta na frente (evita reabrir sem necessidade nas tentativas do boot). */
     static volatile boolean visible;
     private TextView status;
+    /** Abertura: logo da Yes grande e a da Imperium X embaixo (enquanto o player carrega ou sem conexao). */
+    private FrameLayout splash;
     private boolean failed;
     private int backCount;
     private long lastBack;
@@ -69,15 +72,9 @@ public class MainActivity extends Activity {
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        status = new TextView(this);
-        status.setTextColor(Color.WHITE);
-        status.setTextSize(22);
-        status.setGravity(Gravity.CENTER);
-        status.setBackgroundColor(Color.parseColor("#0B1120"));
-        status.setVisibility(View.GONE);
         setContentView(root);
         createWebView();
-        root.addView(status, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        buildSplash();
 
         if (prefs.getString(KEY_URL, "").isEmpty()) showSetup(); else { loadPlayer(); checkAutostart(false); }
     }
@@ -160,7 +157,7 @@ public class MainActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                if (!failed) status.setVisibility(View.GONE);
+                if (!failed) splash.setVisibility(View.GONE);
             }
 
             @Override
@@ -206,6 +203,35 @@ public class MainActivity extends Activity {
         return url + (url.contains("?") ? "&" : "?") + "girar=" + rotate;
     }
 
+    private void buildSplash() {
+        int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
+        int shortSide = Math.min(w, h);
+        splash = new FrameLayout(this);
+        splash.setBackgroundColor(Color.parseColor("#1B0C30"));
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_HORIZONTAL);
+        ImageView yes = new ImageView(this);
+        yes.setImageResource(R.drawable.splash_yes);
+        yes.setAdjustViewBounds(true);
+        col.addView(yes, new LinearLayout.LayoutParams(Math.min((int) (w * 0.5), (int) (h * 0.9)), ViewGroup.LayoutParams.WRAP_CONTENT));
+        status = new TextView(this);
+        status.setTextColor(Color.parseColor("#D8CCF0"));
+        status.setTextSize(18);
+        status.setGravity(Gravity.CENTER);
+        status.setText("Carregando...");
+        status.setPadding(0, shortSide / 30, 0, 0);
+        col.addView(status);
+        splash.addView(col, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        ImageView imperium = new ImageView(this);
+        imperium.setImageResource(R.drawable.splash_imperium);
+        imperium.setAdjustViewBounds(true);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams((int) (shortSide * 0.28), ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        lp.bottomMargin = shortSide / 18;
+        splash.addView(imperium, lp);
+        root.addView(splash, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
     private void loadPlayer() {
         handler.removeCallbacksAndMessages(null);
         web.loadUrl(playerUrl(prefs.getString(KEY_URL, ""), prefs.getString(KEY_ROTATE, "0")));
@@ -213,8 +239,8 @@ public class MainActivity extends Activity {
 
     private void retryLater() {
         failed = true;
-        status.setText("Sem conexão com o servidor.\nTentando novamente em instantes...\n\n(tecla MENU abre as opções)");
-        status.setVisibility(View.VISIBLE);
+        status.setText("Sem conexão com o servidor. Tentando novamente em instantes...\n(tecla MENU abre as opções)");
+        splash.setVisibility(View.VISIBLE);
         handler.removeCallbacksAndMessages(null);
         handler.postDelayed(this::loadPlayer, RETRY_MS);
     }

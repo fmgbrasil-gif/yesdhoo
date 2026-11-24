@@ -12,7 +12,7 @@ Funciona com as duas retaguardas deste repositório (Node e PHP), pois ambas usa
 
 ## Instalar no box
 
-1. Copie `dist/YesDoohPlayer-1.3-teste.apk` para o aparelho (pendrive ou download) e instale, permitindo "fontes desconhecidas".
+1. Copie `dist/YesDoohPlayer-1.4-teste.apk` para o aparelho (pendrive ou download) e instale, permitindo "fontes desconhecidas".
 2. Abra o app e informe o **endereço do servidor**:
    - retaguarda Node: `https://painel.suaempresa.com.br`
    - retaguarda PHP: `https://seusite.com.br/yesdooh` (ou o endereço completo terminando em `player.php`)

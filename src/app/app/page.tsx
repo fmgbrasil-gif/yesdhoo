@@ -22,7 +22,7 @@ export default async function AppPage() {
       <div className="mx-auto max-w-2xl space-y-6">
         <header className="flex items-center gap-3">
           <img src="/brand/yes.png" alt="Yes" className="h-12 w-auto" />{/* eslint-disable-line @next/next/no-img-element */}
-          <div><h1 className="text-2xl font-black">Yes DOOH Player</h1><p className="text-sm text-gray-500">App para TV box, Android TV e Fire TV · Android 5.0 ou superior · versão 1.3</p></div>
+          <div><h1 className="text-2xl font-black">Yes DOOH Player</h1><p className="text-sm text-gray-500">App para TV box, Android TV e Fire TV · Android 5.0 ou superior · versão 1.4</p></div>
         </header>
         <section className="flex flex-wrap items-center gap-6 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
           <img src={qr} alt="QR Code para baixar o app" className="h-40 w-40" />{/* eslint-disable-line @next/next/no-img-element */}
