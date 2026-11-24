@@ -13,6 +13,8 @@ export async function saveClient(_: ActionResult, fd: FormData): Promise<ActionR
   const id = str(fd, 'id');
   const current = id ? await db.client.findFirst({ where: { id, tenantId: user.tenantId } }) : null;
   if (id && !current) return { error: 'Cliente não encontrado.' };
+  // cliente novo so pelo Financeiro (Nova cobranca): cadastro + cobranca + contrato
+  if (!id) return { error: 'Cadastre clientes novos pelo Financeiro → Nova cobrança, junto com a cobrança e o contrato.' };
   const name = str(fd, 'name');
   if (!name) return { error: 'Informe o nome do cliente.' };
   let image = current?.image ?? null;

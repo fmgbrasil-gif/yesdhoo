@@ -85,6 +85,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   const [draftKey, setDraftKey] = useState(0);
   const [docNotes, setDocNotes] = useState<string[]>([]);
   const [client, setClient] = useState<WizardClient | null>(null);
+  const [newClient, setNewClient] = useState(false); // cadastrado agora: contrato obrigatorio
   // etapas 2 a 5
   const [charge, setCharge] = useState<Charge | null>(null);
   const [ops, setOps] = useState(initialOps);
@@ -110,7 +111,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
     const id = String(new FormData(e.currentTarget).get('clientId') ?? '');
     const c = clients.find((x) => x.id === id);
     if (!c) { setError('Escolha o cliente.'); return; }
-    setClient({ id: c.id, name: c.name, kind: c.kind }); go(1);
+    setClient({ id: c.id, name: c.name, kind: c.kind }); setNewClient(false); go(1);
   };
   const readDocs = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -127,7 +128,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
     run(async () => {
       const r = await wizardSaveClient(fd);
       if (!r.ok) { setError(r.error); return; }
-      setClient(r.client); go(1);
+      setClient(r.client); setNewClient(true); go(1);
     });
   };
 
@@ -228,7 +229,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
           <h2 className="flex items-center gap-2 text-lg font-bold"><Users size={18} /> Cliente</h2>
           <div className="flex gap-1 rounded-lg bg-ink-100 p-1 dark:bg-ink-900" role="radiogroup" aria-label="Cliente">
             {([['existente', 'Cliente já cadastrado'], ['novo', 'Cadastrar novo cliente']] as const).map(([k, l]) => (
-              <button key={k} type="button" role="radio" aria-checked={clientMode === k} onClick={() => { setClientMode(k); setError(''); }}
+              <button key={k} type="button" role="radio" aria-checked={clientMode === k} onClick={() => { setClientMode(k); setError(''); if (k === 'novo' && !draft) { setDraft({}); setDraftKey((x) => x + 1); } }}
                 className={`flex-1 rounded-md px-3 py-1.5 text-sm font-semibold ${clientMode === k ? 'bg-white shadow-sm dark:bg-ink-700' : 'text-ink-500 dark:text-ink-300'}`}>{l}</button>
             ))}
           </div>
@@ -249,15 +250,15 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
           ) : (
             <div className="space-y-4">
               <form onSubmit={readDocs} className="space-y-3 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 p-4 dark:border-ink-600 dark:bg-ink-900">
-                <p className="text-sm"><b>Envie o cartão CNPJ</b> e, se quiser, outros documentos (contrato social, comprovante de endereço, cartão de visita). {hasAi ? 'A IA lê os documentos e preenche o cadastro.' : 'O sistema encontra o CNPJ no PDF e busca os dados na Receita. Para ler imagens e outros documentos, cadastre a chave da OpenAI em Minha empresa.'}</p>
+                <p className="text-sm"><b>Opção 1 — envie documentos:</b> cartão CNPJ e, se quiser, outros documentos (contrato social, comprovante de endereço, cartão de visita). {hasAi ? 'A IA lê os documentos e preenche o cadastro.' : 'O sistema encontra o CNPJ no PDF e busca os dados na Receita. Para ler imagens e outros documentos, cadastre a chave da OpenAI em Minha empresa.'}</p>
                 <input type="file" name="docs" multiple required accept="application/pdf,image/png,image/jpeg,image/webp" aria-label="Documentos do cliente" className="input" />
                 <div className="flex flex-wrap justify-end gap-2">
-                  {!draft && <button type="button" className="btn-ghost" onClick={() => { setDraft({}); setDraftKey((k) => k + 1); }}>Preencher à mão</button>}
                   <button className="btn-dark" disabled={busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <FileSearch size={15} />} Ler documentos</button>
                 </div>
               </form>
               {draft && (
                 <form key={draftKey} onSubmit={saveClient} className="space-y-4">
+                  <p className="text-sm"><b>Opção 2 — pelo CNPJ:</b> digite o CNPJ e use <b>Buscar dados</b>, ou <b>Consultar no site da Receita</b> e depois <b>Importar cartão CNPJ (PDF)</b>. Também dá para preencher à mão.</p>
                   {docNotes.length > 0 && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">{docNotes.join(' ')} Confira os dados antes de salvar.</p>}
                   <ClientFields d={draft} />
                   <div className="flex justify-end"><button className="btn-primary" disabled={busy}>{busy ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />} Salvar cliente e avançar</button></div>
@@ -322,7 +323,9 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
               )}
               <div className="flex flex-wrap justify-end gap-2">
                 <span className="mr-auto">{back(1)}</span>
-                <button type="button" className="btn-ghost" onClick={() => go(3)} disabled={busy}><SkipForward size={15} /> Pular contrato</button>
+                {newClient
+                  ? <span className="self-center text-xs text-ink-400">Cliente novo: o contrato é obrigatório.</span>
+                  : <button type="button" className="btn-ghost" onClick={() => go(3)} disabled={busy}><SkipForward size={15} /> Pular contrato</button>}
                 <button type="button" className="btn-primary" onClick={makeContract} disabled={busy || !opId}>{busy ? <Loader2 size={15} className="animate-spin" /> : <FileSignature size={15} />} Gerar contrato</button>
               </div>
             </div>

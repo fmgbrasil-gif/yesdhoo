@@ -65,7 +65,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader title="Clientes e parceiros" crumbs={[{ label: 'Clientes e parceiros' }]}>
-        <Modal trigger={<><Plus size={16} /> Novo cliente</>} title="Novo cliente"><ActionForm action={saveClient}><ClientFields /></ActionForm></Modal>
+        <Link href="/financeiro/nova" className="btn-primary" title="Clientes novos são cadastrados pela Nova cobrança, junto com a cobrança e o contrato"><Plus size={16} /> Novo cliente</Link>
       </PageHeader>
       <div className="card overflow-hidden">
         <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">{tab(undefined, 'Todos', (counts.cliente ?? 0) + (counts.parceiro ?? 0))}{tab('cliente', 'Clientes', counts.cliente ?? 0)}{tab('parceiro', 'Parceiros', counts.parceiro ?? 0)}</div>
