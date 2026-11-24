@@ -76,10 +76,16 @@ export async function readClientDocs(t: Tenant, files: Attachment[]): Promise<{ 
   const texts = await Promise.all(files.map((f) => (f.mime === 'application/pdf' ? pdfText(f) : Promise.resolve(''))));
   const draft = empty();
   const key = openaiKey(t);
+  let aiError = '';
   if (key) {
-    const ai = await aiExtract(key, files, texts);
-    for (const f of FIELDS) { const v = String(ai[f] ?? '').trim(); if (v) (draft as Record<string, string>)[f] = v; }
-    notes.push('Documentos lidos pela IA.');
+    try {
+      const ai = await aiExtract(key, files, texts);
+      for (const f of FIELDS) { const v = String(ai[f] ?? '').trim(); if (v) (draft as Record<string, string>)[f] = v; }
+      notes.push('Documentos lidos pela IA.');
+    } catch (e) {
+      // sem IA, segue com o texto do PDF + Receita
+      aiError = e instanceof Error ? e.message : 'A IA não respondeu.';
+    }
   }
   // CNPJ: o que a IA achou ou o primeiro CNPJ valido no texto dos PDFs
   let cnpj = validCnpj(draft.document) ? draft.document.replace(/\D/g, '') : '';
@@ -96,7 +102,8 @@ export async function readClientDocs(t: Tenant, files: Attachment[]): Promise<{ 
       }
     } catch { notes.push('A consulta à Receita falhou; confira os dados.'); }
   }
-  if (!key && !cnpj) throw new Error('Não encontrei um CNPJ nos documentos. Para ler imagens e outros documentos, cadastre a chave da OpenAI em Minha empresa → Inteligência artificial, ou preencha os dados à mão.');
+  if (!cnpj && (!key || aiError)) throw new Error(aiError ? `Não encontrei um CNPJ no arquivo e a IA não pôde ler: ${aiError}` : 'Não encontrei um CNPJ nos documentos. Para ler imagens e outros documentos, cadastre a chave da OpenAI em Minha empresa → Inteligência artificial, ou preencha os dados à mão.');
+  if (aiError) notes.push(`(A IA não foi usada: ${aiError})`);
   draft.zipcode = draft.zipcode.replace(/\D/g, '');
   return { draft, notes };
 }
