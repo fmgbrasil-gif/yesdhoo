@@ -11,6 +11,7 @@ import { ActionButton, ActionForm, Confirm, Modal, Tabs } from '@/components/ui'
 import { MediaFields, ScreensPicker } from '@/components/MediaForm';
 import { deleteMedia, saveMedia, toggleMedia, saveMediaScreens } from './actions';
 import { kindLabel } from '@/lib/client-kind';
+import { OrientationIcons } from '@/components/OrientationIcons';
 
 const TYPES = ['arquivo', 'youtube', 'link'];
 
@@ -77,7 +78,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
                         </Link>
                       </td>
                       <td className="td font-semibold">{onScreens.length}</td>
-                      <td className="td text-ink-500">{m.type !== 'arquivo' ? 'Ambas' : [m.fileH && 'Horizontal', m.fileV && 'Vertical'].filter(Boolean).join(' + ')}</td>
+                      <td className="td"><OrientationIcons h={m.type !== 'arquivo' || !!m.fileH} v={m.type !== 'arquivo' || !!m.fileV} /></td>
                       <td className="td">
                         <span className={`badge ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-500'}`}>{m.active ? 'Ativa' : 'Inativa'}</span>
                         {m.client && !m.client.active && <span className="badge ml-1 bg-red-100 text-red-700" title="O cadastro está desativado: não roda nas telas">Fora do ar</span>}
