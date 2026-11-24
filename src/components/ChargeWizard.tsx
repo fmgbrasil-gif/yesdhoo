@@ -240,8 +240,8 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
               <Field label="Cliente ou parceiro">
                 <select name="clientId" required className="input" defaultValue={client && clients.some((c) => c.id === client.id) ? client.id : ''}>
                   <option value="" disabled>Selecione...</option>
-                  {['cliente', 'parceiro'].map((k) => (
-                    <optgroup key={k} label={k === 'cliente' ? 'Clientes' : 'Parceiros'}>
+                  {['cliente', 'parceiro', 'cortesia'].map((k) => (
+                    <optgroup key={k} label={k === 'cliente' ? 'Clientes' : k === 'parceiro' ? 'Parceiros' : 'Cortesias'}>
                       {clients.filter((c) => c.kind === k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </optgroup>
                   ))}

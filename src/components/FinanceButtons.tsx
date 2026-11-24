@@ -7,6 +7,7 @@ import { ActionForm, Field, Modal } from './ui';
 import { ChargeFields, type AccountOpt, type OpOpt } from './ChargeForm';
 import type { ServiceOpt } from './InvoiceItems';
 import { generateContract, saveCharge } from '@/app/(painel)/financeiro/actions';
+import { kindLabel } from '@/lib/client-kind';
 
 type Opt = { id: string; name: string; kind: string };
 
@@ -24,7 +25,7 @@ export function FinanceButtons({ clients, subs: activeSubs, services, operations
             <Field label="Cliente ou parceiro">
               <select name="clientId" required className="input" defaultValue="">
                 <option value="" disabled>Selecione...</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.name} ({c.kind === 'parceiro' ? 'parceiro' : 'cliente'})</option>)}
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name} ({kindLabel(c.kind).toLowerCase()})</option>)}
               </select>
             </Field>
             <Field label="Condições comerciais" hint="Valor, prazo e vencimento vêm desta cobrança">

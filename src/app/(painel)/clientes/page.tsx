@@ -1,5 +1,5 @@
 import type { Client } from '@prisma/client';
-import { Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
+import { Gift, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { fileUrl } from '@/lib/storage';
@@ -10,8 +10,10 @@ import { Avatar, Empty, PageHeader, Pagination, pageParams } from '@/components/
 import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { deleteClient, saveClient, toggleClient } from './actions';
 import { CnpjLookup } from '@/components/CnpjLookup';
+import { kindBadge, kindLabel } from '@/lib/client-kind';
 
-function ClientFields({ c }: { c?: Client }) {
+function ClientFields({ c, kind }: { c?: Client; kind?: string }) {
+  const k = c?.kind ?? kind ?? 'cliente';
   const f = (name: keyof Client, label: string, cls = '', extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <Field label={label} className={cls}><input name={name} defaultValue={(c?.[name] as string) ?? ''} className="input" {...extra} /></Field>
   );
@@ -21,8 +23,9 @@ function ClientFields({ c }: { c?: Client }) {
       <div className="grid grid-cols-6 gap-3">
         <Field label="Cadastro" className="col-span-6">
           <div className="flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2"><input type="radio" name="kind" value="cliente" defaultChecked={c?.kind !== 'parceiro'} className="accent-violet-500" /> Cliente (anunciante, compra mídia)</label>
-            <label className="flex items-center gap-2"><input type="radio" name="kind" value="parceiro" defaultChecked={c?.kind === 'parceiro'} className="accent-violet-500" /> Parceiro (local onde fica a tela)</label>
+            <label className="flex items-center gap-2"><input type="radio" name="kind" value="cliente" defaultChecked={k === 'cliente'} className="accent-violet-500" /> Cliente (anunciante, compra mídia)</label>
+            <label className="flex items-center gap-2"><input type="radio" name="kind" value="parceiro" defaultChecked={k === 'parceiro'} className="accent-violet-500" /> Parceiro (local onde fica a tela)</label>
+            <label className="flex items-center gap-2"><input type="radio" name="kind" value="cortesia" defaultChecked={k === 'cortesia'} className="accent-violet-500" /> Cortesia (anuncia sem pagar, não é parceiro)</label>
           </div>
         </Field>
         <Field label="Tipo" className="col-span-2">
@@ -53,7 +56,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
   const user = await requireUser();
   const { page, size, skip, take } = pageParams(sp);
   // padrao: so clientes; parceiros e todos pelas abas
-  const kind = sp.tipo === 'parceiro' ? 'parceiro' : sp.tipo === 'todos' ? undefined : 'cliente';
+  const kind = sp.tipo === 'parceiro' || sp.tipo === 'cortesia' ? sp.tipo : sp.tipo === 'todos' ? undefined : 'cliente';
   const where = { tenantId: user.tenantId, ...(kind ? { kind } : {}), ...(sp.q ? { name: like(sp.q) } : {}), ...(sp.doc ? { document: sp.doc.replace(/\D/g, '') } : {}) };
   const counts = Object.fromEntries((await db.client.groupBy({ by: ['kind'], where: { tenantId: user.tenantId }, _count: true })).map((g) => [g.kind, g._count]));
   const tab = (k: string | undefined, label: string, n: number) => (
@@ -67,9 +70,10 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader title="Clientes e parceiros" crumbs={[{ label: 'Clientes e parceiros' }]}>
         <Link href="/financeiro/nova" className="btn-primary" title="Clientes novos são cadastrados pela Nova cobrança, junto com a cobrança e o contrato"><Plus size={16} /> Novo cliente</Link>
+        <Modal trigger={<><Gift size={16} /> Nova cortesia</>} triggerClass="btn-ghost" title="Nova cortesia"><ActionForm action={saveClient}><p className="mb-3 text-sm text-ink-500">Cortesia: anuncia nas telas sem pagar e não é parceiro. Não gera cobrança nem contrato.</p><ClientFields kind="cortesia" /></ActionForm></Modal>
       </PageHeader>
       <div className="card overflow-hidden">
-        <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">{tab('cliente', 'Clientes', counts.cliente ?? 0)}{tab('parceiro', 'Parceiros', counts.parceiro ?? 0)}{tab(undefined, 'Todos', (counts.cliente ?? 0) + (counts.parceiro ?? 0))}</div>
+        <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">{tab('cliente', 'Clientes', counts.cliente ?? 0)}{tab('parceiro', 'Parceiros', counts.parceiro ?? 0)}{tab('cortesia', 'Cortesias', counts.cortesia ?? 0)}{tab(undefined, 'Todos', Object.values(counts).reduce((a, n) => a + n, 0))}</div>
         <form className="flex flex-wrap gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
           <input type="hidden" name="tipo" value={kind ?? 'todos'} />
           <input name="q" defaultValue={sp.q} placeholder="Buscar por nome..." className="input w-56" aria-label="Nome" />
@@ -83,7 +87,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
               <tbody className="divide-y divide-ink-100 dark:divide-ink-700">
                 {rows.map((c) => (
                   <tr key={c.id} className={c.active ? '' : 'opacity-60'}>
-                    <td className="td"><span className="flex items-center gap-3"><Avatar src={fileUrl(c.image)} name={c.name} /><span><span className="block font-semibold">{c.name}</span><span className="text-xs text-ink-400"><span className={`badge mr-1 ${c.kind === 'parceiro' ? 'bg-sky-100 text-sky-700' : 'bg-brand-100 text-brand-700'}`}>{c.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}</span>{!c.active && <span className="badge mr-1 bg-red-100 text-red-700">Desativado</span>}{c.email ?? ''}</span></span></span></td>
+                    <td className="td"><span className="flex items-center gap-3"><Avatar src={fileUrl(c.image)} name={c.name} /><span><span className="block font-semibold">{c.name}</span><span className="text-xs text-ink-400"><span className={`badge mr-1 ${kindBadge(c.kind)}`}>{kindLabel(c.kind)}</span>{!c.active && <span className="badge mr-1 bg-red-100 text-red-700">Desativado</span>}{c.email ?? ''}</span></span></span></td>
                     <td className="td text-ink-500">{c.city ? `${c.city}${c.state ? '/' + c.state : ''}` : '—'}</td>
                     <td className="td text-ink-500">{c.phone1 ?? '—'}</td>
                     <td className="td font-semibold">{c._count.medias}</td>

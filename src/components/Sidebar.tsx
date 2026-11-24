@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone, KeyRound,
+  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone, KeyRound, FileVideo,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
@@ -25,6 +25,7 @@ const NAV = [
   { group: 'Conteúdos' },
   { href: '/midias', label: 'Minhas mídias', icon: Film },
   { href: '/grupos', label: 'Grupos de mídia', icon: Layers },
+  { href: '/especificacoes', label: 'Especificações de mídia', icon: FileVideo },
   { href: '/biblioteca', label: 'Conteúdos dinâmicos', icon: Sparkles },
   { href: '/rss', label: 'RSS personalizado', icon: Rss },
   { href: '/avisos', label: 'Avisos', icon: Megaphone },

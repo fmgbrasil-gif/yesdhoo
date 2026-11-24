@@ -17,6 +17,7 @@ import { OperationAccountFields } from '@/components/ChargeForm';
 import { opDescription } from '@/lib/op-text';
 import { PeriodBar } from '@/components/PeriodBar';
 import { periodHref, resolvePeriod } from '@/lib/period';
+import { kindLabel } from '@/lib/client-kind';
 
 // a geracao de contrato com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
@@ -112,7 +113,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                     const late = s.invoices.filter((i) => i.status === 'aberta' && i.dueDate < today).length;
                     return (
                       <tr key={s.id} className={s.status === 'ativa' ? '' : 'opacity-60'}>
-                        <td className="td"><span className="block font-semibold">{s.client.name}</span><span className="text-xs text-ink-400">{s.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{!s.client.active && ' · desativado'}</span></td>
+                        <td className="td"><span className="block font-semibold">{s.client.name}</span><span className="text-xs text-ink-400">{kindLabel(s.client.kind)}{!s.client.active && ' · desativado'}</span></td>
                         <td className="td"><span className="inline-flex items-center gap-1">{s.mode === 'recorrente' && <Repeat size={13} />}{SUB_MODE(s)}</span><span className="block text-xs text-ink-400">desde {competenceLabel(s.startMonth)}</span></td>
                         <td className="td text-right font-semibold tabular-nums">{fmtMoney(s.amountCents)}</td>
                         <td className="td">dia {s.dueDay}</td>
@@ -190,7 +191,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                   return (
                     <tr key={inv.id}>
                       <td className="td font-mono text-ink-500">{String(inv.number).padStart(5, '0')}</td>
-                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{inv.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}{inv.operation ? ` · ${inv.operation.name}` : ''}</span></td>
+                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{kindLabel(inv.client.kind)}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}{inv.operation ? ` · ${inv.operation.name}` : ''}</span></td>
                       <td className="td tabular-nums">{fmtDate(inv.dueDate)}</td>
                       <td className="td text-right font-semibold tabular-nums">{fmtMoney(inv.amountCents)}</td>
                       <td className="td">

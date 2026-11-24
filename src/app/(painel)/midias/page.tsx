@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Eye, Layers, Pencil, Plus, Power, Search, Trash2, MonitorUp } from 'lucide-react';
+import { Eye, Layers, Pencil, Plus, Power, Search, Trash2, MonitorUp, FileVideo } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { fmtDuration, timeAgo } from '@/lib/util';
@@ -10,6 +10,7 @@ import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionButton, ActionForm, Confirm, Modal, Tabs } from '@/components/ui';
 import { MediaFields, ScreensPicker } from '@/components/MediaForm';
 import { deleteMedia, saveMedia, toggleMedia, saveMediaScreens } from './actions';
+import { kindLabel } from '@/lib/client-kind';
 
 const TYPES = ['arquivo', 'youtube', 'link'];
 
@@ -17,7 +18,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const user = await requireUser();
   const { page, size, skip, take } = pageParams(sp);
-  const origem = ['cliente', 'parceiro', 'institucional'].includes(sp.origem ?? '') ? sp.origem : undefined;
+  const origem = ['cliente', 'parceiro', 'cortesia', 'institucional'].includes(sp.origem ?? '') ? sp.origem : undefined;
   const base = { tenantId: user.tenantId, type: { in: TYPES } };
   const byOrigin = (o?: string) => (o === 'institucional' ? { clientId: null } : o ? { client: { kind: o } } : {});
   const where = {
@@ -26,8 +27,8 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
     ...(sp.cliente ? { client: { name: like(sp.cliente) } } : {}),
     ...(sp.status === 'ativo' ? { active: true } : sp.status === 'inativo' ? { active: false } : {}),
   };
-  const counts = await Promise.all(['cliente', 'parceiro', 'institucional'].map((o) => db.media.count({ where: { ...base, ...byOrigin(o) } })));
-  const tabs: [string | undefined, string, number][] = [[undefined, 'Todas', counts[0] + counts[1] + counts[2]], ['cliente', 'Clientes', counts[0]], ['parceiro', 'Parceiros', counts[1]], ['institucional', 'Institucional', counts[2]]];
+  const counts = await Promise.all(['cliente', 'parceiro', 'cortesia', 'institucional'].map((o) => db.media.count({ where: { ...base, ...byOrigin(o) } })));
+  const tabs: [string | undefined, string, number][] = [[undefined, 'Todas', counts[0] + counts[1] + counts[2] + counts[3]], ['cliente', 'Clientes', counts[0]], ['parceiro', 'Parceiros', counts[1]], ['cortesia', 'Cortesias', counts[2]], ['institucional', 'Institucional', counts[3]]];
   const [rows, total, data] = await Promise.all([
     db.media.findMany({ where, skip, take, orderBy: { updatedAt: 'desc' }, include: { client: { select: { name: true, kind: true, active: true } }, items: { select: { screenId: true } } } }),
     db.media.count({ where }),
@@ -37,6 +38,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader title="Minhas mídias" crumbs={[{ label: 'Conteúdos' }, { label: 'Minhas mídias' }]}>
+        <a href="/especificacoes" target="_blank" className="btn-ghost" title="Formato, resolução, duração e tamanho dos vídeos — para enviar a clientes e parceiros"><FileVideo size={16} /> Especificações de mídia</a>
         <Link href="/grupos" className="btn-ghost"><Layers size={16} /> Grupos</Link>
         <Modal trigger={<><Plus size={16} /> Nova mídia</>} title="Nova mídia">
           <Tabs tabs={TYPES.map((t) => ({ label: MEDIA_TYPES[t], content: <ActionForm action={saveMedia}><MediaFields type={t} data={data} /></ActionForm> }))} />
@@ -71,7 +73,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
                             {thumb ? <img src={thumb} alt="" className="h-full w-full object-cover" /> : MEDIA_TYPES[m.type]}{/* eslint-disable-line @next/next/no-img-element */}
                             <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[10px] text-white">{fmtDuration(m.duration)}</span>
                           </span>
-                          <span><span className="block font-semibold">{m.name}</span><span className="text-xs text-ink-400">{m.type === 'arquivo' ? (m.kind === 'video' ? 'Vídeo' : 'Imagem') : MEDIA_TYPES[m.type]} · {m.client ? <>{m.client.kind === 'parceiro' ? 'Parceiro' : 'Cliente'}: {m.client.name}</> : 'Institucional'}</span></span>
+                          <span><span className="block font-semibold">{m.name}</span><span className="text-xs text-ink-400">{m.type === 'arquivo' ? (m.kind === 'video' ? 'Vídeo' : 'Imagem') : MEDIA_TYPES[m.type]} · {m.client ? <>{kindLabel(m.client.kind)}: {m.client.name}</> : 'Institucional'}</span></span>
                         </Link>
                       </td>
                       <td className="td font-semibold">{onScreens.length}</td>

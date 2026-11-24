@@ -13,6 +13,8 @@ export type Playable = {
   duration: number;
   thumb: string | null;
   compatible: boolean;
+  /** Motivo de nao poder tocar nesta tela (quando compatible = false). */
+  reason?: string | null;
   period: string | null;
   endIso?: string | null;
   count?: number;
@@ -43,10 +45,17 @@ export function isCompatible(m: Media, orientation: string) {
 
 const br = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
+/** Explica por que a midia nao toca na tela (ou null se toca). */
+export function incompatibleReason(m: MediaWithClient, orientation: string) {
+  if (m.client?.active === false) return 'Cliente desativado';
+  if (isCompatible(m, orientation)) return null;
+  return orientation === 'V' ? 'Só tem arquivo horizontal — envie a versão vertical (1080×1920)' : 'Só tem arquivo vertical — envie a versão horizontal (1920×1080)';
+}
+
 export function mediaToPlayable(m: MediaWithClient, orientation: string): Playable {
   return {
     key: `m:${m.id}`, id: m.id, isGroup: false, name: m.name, sub: m.client ? (m.client.active === false ? `${m.client.name} (desativado)` : m.client.name) : m.library ? 'Biblioteca' : 'Avulso', type: m.type, section: mediaSection(m),
-    duration: m.duration, thumb: mediaThumb(m), compatible: isCompatible(m, orientation) && m.client?.active !== false,
+    duration: m.duration, thumb: mediaThumb(m), compatible: isCompatible(m, orientation) && m.client?.active !== false, reason: incompatibleReason(m, orientation),
     period: m.startDate || m.endDate ? `${m.startDate ? br(m.startDate) : '…'} a ${m.endDate ? br(m.endDate) : '…'}` : null,
     endIso: m.endDate,
   };

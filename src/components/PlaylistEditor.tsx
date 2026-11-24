@@ -94,10 +94,10 @@ export function PlaylistEditor({ screenId, playables, initial, others, save }: {
           <div className="grid max-h-[62vh] gap-2 overflow-y-auto p-4 sm:grid-cols-2">
             {list.length === 0 && <p className="col-span-full py-8 text-center text-sm text-ink-400">Nenhum conteúdo encontrado...</p>}
             {list.map((p) => (
-              <button key={p.key} disabled={!p.compatible} onClick={() => change([...items, row(p.key)])} title={p.compatible ? 'Adicionar à playlist' : 'Não há arquivo para a orientação desta tela'}
+              <button key={p.key} disabled={!p.compatible} onClick={() => change([...items, row(p.key)])} title={p.compatible ? 'Adicionar à playlist' : (p.reason ?? 'Não há arquivo para a orientação desta tela')}
                 className="group flex items-center gap-3 rounded-lg border border-ink-100 p-2 text-left hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-ink-700">
                 <Thumb p={p} />
-                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{p.name}</span><span className="block truncate text-xs text-ink-400">{p.compatible ? p.sub : 'Mídia incompatível'}</span></span>
+                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{p.name}</span><span className="block truncate text-xs text-ink-400">{p.compatible ? p.sub : `Incompatível: ${p.reason ?? 'sem arquivo para esta tela'}`}</span></span>
                 <Plus size={18} className="text-ink-300 group-hover:text-brand-600" />
               </button>
             ))}
@@ -136,7 +136,7 @@ export function PlaylistEditor({ screenId, playables, initial, others, save }: {
                   <span className="block truncate text-sm font-semibold">{p.name}</span>
                   <span className="flex items-center gap-1 truncate text-xs text-ink-400">
                     {!p.compatible && <AlertTriangle size={12} className="text-red-500" />}
-                    {p.period ? <><CalendarClock size={12} className={expired(p) ? 'text-red-500' : ''} /> {p.period}</> : p.compatible ? p.sub : 'Mídia incompatível'}
+                    {p.period ? <><CalendarClock size={12} className={expired(p) ? 'text-red-500' : ''} /> {p.period}</> : p.compatible ? p.sub : <span title={p.reason ?? ''}>Incompatível: {p.reason ?? 'sem arquivo para esta tela'}</span>}
                   </span>
                 </span>
                 <span className="flex flex-col">

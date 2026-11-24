@@ -74,8 +74,8 @@ export function ChargeFields({ clients, today, services, fixedClient, operations
         ) : <Field label="Cliente ou parceiro" className="sm:col-span-3">
           <select name="clientId" required className="input" defaultValue="">
             <option value="" disabled>Selecione...</option>
-            {['cliente', 'parceiro'].map((k) => (
-              <optgroup key={k} label={k === 'cliente' ? 'Clientes' : 'Parceiros'}>
+            {['cliente', 'parceiro', 'cortesia'].map((k) => (
+              <optgroup key={k} label={k === 'cliente' ? 'Clientes' : k === 'parceiro' ? 'Parceiros' : 'Cortesias'}>
                 {clients.filter((c) => c.kind === k).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </optgroup>
             ))}

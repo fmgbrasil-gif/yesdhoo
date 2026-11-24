@@ -7,6 +7,7 @@ import { str } from '@/lib/util';
 import { isUpload, removeFile, saveFile } from '@/lib/storage';
 import { cancelSubscription } from '@/lib/billing';
 import type { ActionResult } from '@/components/ui';
+import { parseKind } from '@/lib/client-kind';
 
 export async function saveClient(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireUser();
@@ -14,13 +15,14 @@ export async function saveClient(_: ActionResult, fd: FormData): Promise<ActionR
   const current = id ? await db.client.findFirst({ where: { id, tenantId: user.tenantId } }) : null;
   if (id && !current) return { error: 'Cliente não encontrado.' };
   // cliente novo so pelo Financeiro (Nova cobranca): cadastro + cobranca + contrato
-  if (!id) return { error: 'Cadastre clientes novos pelo Financeiro → Nova cobrança, junto com a cobrança e o contrato.' };
+  // cortesia (anuncia sem pagar) pode ser cadastrada direto aqui, sem cobranca nem contrato
+  if (!id && fd.get('kind') !== 'cortesia') return { error: 'Cadastre clientes novos pelo Financeiro → Nova cobrança, junto com a cobrança e o contrato.' };
   const name = str(fd, 'name');
   if (!name) return { error: 'Informe o nome do cliente.' };
   let image = current?.image ?? null;
   if (isUpload(fd.get('image'))) { await removeFile(image); image = await saveFile(fd.get('image') as File, 'clientes'); }
   const data = {
-    kind: fd.get('kind') === 'parceiro' ? 'parceiro' : 'cliente',
+    kind: parseKind(fd.get('kind')),
     name, image, type: fd.get('type') === 'PF' ? 'PF' : 'PJ', tradeName: str(fd, 'tradeName'), stateRegistration: str(fd, 'stateRegistration'), document: str(fd, 'document')?.replace(/\D/g, '') ?? null, email: str(fd, 'email'),
     phone1: str(fd, 'phone1'), phone2: str(fd, 'phone2'), road: str(fd, 'road'), number: str(fd, 'number'), complement: str(fd, 'complement'),
     neighborhood: str(fd, 'neighborhood'), zipcode: str(fd, 'zipcode'), city: str(fd, 'city'), state: str(fd, 'state'),
