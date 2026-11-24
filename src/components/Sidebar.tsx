@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins,
+  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
@@ -103,6 +103,11 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
               </Link>
             );
           })}
+          {/* link publico de download do app da TV (abre em nova aba) */}
+          <a href="/app" target="_blank" rel="noreferrer" title="Baixar app da TV"
+            className={`mt-2 flex items-center gap-3 rounded-lg border border-dashed border-ink-600 px-3 py-2 text-sm font-medium hover:border-brand-400 hover:bg-ink-800 hover:text-white ${mini ? 'lg:justify-center lg:px-0' : ''}`}>
+            <Smartphone size={18} className="shrink-0" /><span className={mini ? 'lg:hidden' : ''}>Baixar app da TV</span>
+          </a>
           {!mini && favorites.length > 0 && (
             <>
               <p className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-500">Telas favoritas</p>

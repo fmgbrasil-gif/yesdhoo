@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ListVideo, Send } from 'lucide-react';
+import { ListVideo, Send, Smartphone } from 'lucide-react';
+import { headers } from 'next/headers';
+import QRCode from 'qrcode';
 import { requireUser, screenScope } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { fmtBytes, lastDays, parseJson, timeAgo } from '@/lib/util';
@@ -19,6 +21,10 @@ export default async function TelaPage({ params, searchParams }: { params: Promi
   const daily = (await searchParams).periodo === 'diario';
   const user = await requireUser();
   const screen = await db.screen.findFirst({ where: { ...screenScope(user), id }, include: { category: true } });
+  const h = await headers();
+  const origin = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}`;
+  const appUrl = `${origin}/app`;
+  const appQr = await QRCode.toDataURL(appUrl, { margin: 1, width: 240 });
   if (!screen) notFound();
   const days7 = lastDays(7, screen.timezone);
   const days30 = lastDays(30, screen.timezone);
@@ -56,9 +62,17 @@ export default async function TelaPage({ params, searchParams }: { params: Promi
           {!paired && (
             <section className="card border-brand-300 bg-brand-50 p-5 dark:bg-ink-800">
               <h2 className="mb-1 font-bold">Parear dispositivo</h2>
-              <p className="text-sm text-ink-600 dark:text-ink-200">No aparelho ligado à TV, abra o endereço do player e digite o código abaixo:</p>
+              <p className="text-sm text-ink-600 dark:text-ink-200">No aparelho ligado à TV, abra o app Yes DOOH Player (ou o endereço do player) e digite o código abaixo:</p>
               <p className="my-3 text-center font-mono text-4xl font-black tracking-[0.3em]">{screen.pairingCode}</p>
-              <p className="text-center text-sm">Endereço do player: <Link href="/player" target="_blank" className="font-semibold underline">/player</Link></p>
+              <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl bg-white p-3 dark:bg-ink-900">
+                <img src={appQr} alt="QR Code para baixar o app da TV" className="h-28 w-28" />{/* eslint-disable-line @next/next/no-img-element */}
+                <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+                  <p className="font-semibold">Ainda não instalou o app no TV box?</p>
+                  <a href="/app" target="_blank" rel="noreferrer" className="btn-primary !py-1.5"><Smartphone size={15} /> Baixar app da TV</a>
+                  <p className="break-all text-xs text-ink-400">{appUrl}</p>
+                  <p className="text-xs text-ink-400">Sem TV box? Abra <Link href="/player" target="_blank" className="font-semibold underline">{origin}/player</Link> em qualquer navegador.</p>
+                </div>
+              </div>
             </section>
           )}
           <section className="card overflow-hidden">
