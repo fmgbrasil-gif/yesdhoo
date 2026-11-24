@@ -162,8 +162,10 @@ export function SelectAll({ total, selected, onChange, label = 'Marcar todos', c
   );
 }
 
-export function MultiPicker({ name, options, defaultValue = [], placeholder = 'Buscar...', emptyHint }: {
+export function MultiPicker({ name, options, defaultValue = [], placeholder = 'Buscar...', emptyHint, presets = [] }: {
   name: string; options: { id: string; label: string; sub?: string }[]; defaultValue?: string[]; placeholder?: string; emptyHint?: string;
+  /** atalhos para marcar um grupo de uma vez (ex.: as telas de uma operacao) */
+  presets?: { label: string; ids: string[] }[];
 }) {
   const [sel, setSel] = useState<string[]>(defaultValue);
   const [q, setQ] = useState('');
@@ -176,6 +178,20 @@ export function MultiPicker({ name, options, defaultValue = [], placeholder = 'B
     <div>
       {sel.map((id) => <input key={id} type="hidden" name={name} value={id} />)}
       <input className="input mb-2" placeholder={placeholder} value={q} onChange={(e) => setQ(e.target.value)} aria-label={placeholder} />
+      {presets.filter((pr) => pr.ids.length).length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {presets.filter((pr) => pr.ids.length).map((pr) => {
+            const all = pr.ids.every((id) => sel.includes(id));
+            return (
+              <button key={pr.label} type="button" title={all ? 'Desmarcar as telas desta operação' : 'Marcar todas as telas desta operação'}
+                onClick={() => setSel(all ? sel.filter((id) => !pr.ids.includes(id)) : [...new Set([...sel, ...pr.ids])])}
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${all ? 'border-brand-500 bg-brand-100 text-ink-900' : 'border-ink-200 text-ink-500 hover:border-brand-400 dark:border-ink-600 dark:text-ink-300'}`}>
+                {all ? '✓' : '+'} {pr.label} ({pr.ids.length})
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="rounded-lg border border-ink-100 dark:border-ink-700">
         {options.length > 1 && <SelectAll total={list.length} selected={shownSel} onChange={setAll} label={q ? 'Marcar todos os encontrados' : 'Marcar todos'} className="border-b border-ink-100 px-3.5 py-2 dark:border-ink-700" />}
         <div className="max-h-52 space-y-1 overflow-y-auto p-1.5">

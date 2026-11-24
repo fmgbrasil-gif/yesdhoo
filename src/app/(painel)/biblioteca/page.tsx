@@ -46,7 +46,7 @@ export default async function BibliotecaPage({ searchParams }: { searchParams: P
                   <ActionForm action={includeLibrary} submit="Aplicar">
                     <input type="hidden" name="id" value={m.id} />
                     <p className="text-sm text-ink-500">Marque as telas que devem exibir este conteúdo. Desmarque para remover.</p>
-                    <MultiPicker name="screens" options={data.screens} defaultValue={on} placeholder="Busque pelo nome da tela..." />
+                    <MultiPicker name="screens" options={data.screens} defaultValue={on} presets={data.operations} placeholder="Busque pelo nome da tela..." />
                   </ActionForm>
                 </Modal>
                 </div>

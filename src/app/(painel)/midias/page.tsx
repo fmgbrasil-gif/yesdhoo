@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Eye, Layers, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react';
+import { Eye, Layers, Pencil, Plus, Power, Search, Trash2, MonitorUp } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { fmtDuration, timeAgo } from '@/lib/util';
@@ -8,8 +8,8 @@ import { mediaFormData } from '@/lib/form-data';
 import { MEDIA_TYPES } from '@/lib/constants';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
 import { ActionButton, ActionForm, Confirm, Modal, Tabs } from '@/components/ui';
-import { MediaFields } from '@/components/MediaForm';
-import { deleteMedia, saveMedia, toggleMedia } from './actions';
+import { MediaFields, ScreensPicker } from '@/components/MediaForm';
+import { deleteMedia, saveMedia, toggleMedia, saveMediaScreens } from './actions';
 
 const TYPES = ['arquivo', 'youtube', 'link'];
 
@@ -85,6 +85,13 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
                       <td className="td">
                         <div className="flex justify-end gap-1.5">
                           <ActionButton action={toggleMedia} fields={{ id: m.id }} title={m.active ? 'Desativar' : 'Ativar'}><Power size={15} className={m.active ? 'text-emerald-600' : ''} /></ActionButton>
+                          <Modal trigger={<><MonitorUp size={15} /> Telas</>} triggerClass="btn-ghost !px-2.5 !py-1.5" titleAttr="Telas onde passa" title={`Em quais telas “${m.name}” vai passar?`}>
+                            <ActionForm action={saveMediaScreens} submit="Salvar telas">
+                              <input type="hidden" name="id" value={m.id} />
+                              <p className="text-sm text-ink-500">Marque as telas (ou use os atalhos das operações). Desmarcar tira da playlist.</p>
+                              <ScreensPicker data={data} value={onScreens} />
+                            </ActionForm>
+                          </Modal>
                           <Link href={`/midias/${m.id}`} className="btn-icon" title="Detalhes" aria-label="Detalhes"><Eye size={15} /></Link>
                           <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar" title={`Editar mídia (${MEDIA_TYPES[m.type]})`}>
                             <ActionForm action={saveMedia}><MediaFields type={m.type} media={m} data={data} onScreens={onScreens} /></ActionForm>

@@ -111,6 +111,17 @@ export async function saveMedia(_: ActionResult, fd: FormData): Promise<ActionRe
   return { ok: true, message: 'Salvo.' };
 }
 
+/** So as telas da midia (quadro "Telas onde passa" e botao Telas da lista). */
+export async function saveMediaScreens(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const m = await db.media.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });
+  if (!m) return { error: 'Mídia não encontrada.' };
+  const ids = fd.getAll('screens').map(String);
+  await syncScreens(user, { mediaId: m.id }, ids);
+  revalidatePath('/', 'layout');
+  return { ok: true, message: ids.length ? `Mídia em ${ids.length} tela(s). As telas recebem a mudança na próxima sincronização.` : 'Mídia retirada de todas as telas.' };
+}
+
 export async function toggleMedia(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireUser();
   const m = await db.media.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });

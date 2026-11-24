@@ -9,9 +9,9 @@ import { mediaFormData } from '@/lib/form-data';
 import { MEDIA_TYPES } from '@/lib/constants';
 import { Bars, PageHeader } from '@/components/basic';
 import { ActionForm, Modal } from '@/components/ui';
-import { MediaFields } from '@/components/MediaForm';
+import { MediaFields, ScreensPicker } from '@/components/MediaForm';
 import { Notes } from '@/components/Notes';
-import { saveMedia, saveMediaNotes } from '../actions';
+import { saveMedia, saveMediaNotes, saveMediaScreens } from '../actions';
 
 export default async function MidiaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +24,8 @@ export default async function MidiaPage({ params }: { params: Promise<{ id: stri
     db.screen.findMany({ where: { ...screenScope(user), items: { some: { OR: [{ mediaId: id }, { group: { medias: { some: { mediaId: id } } } }] } } }, orderBy: { name: 'asc' } }),
     db.playStat.groupBy({ by: ['date'], where: { mediaId: id, date: { gte: days[0] } }, _sum: { count: true } }),
   ]);
+  // telas em que a midia esta direto na playlist (as de grupos aparecem na lista abaixo)
+  const direct = (await db.playlistItem.findMany({ where: { mediaId: id, screen: screenScope(user) }, select: { screenId: true } })).map((i) => i.screenId);
   const byDate = Object.fromEntries(stats.map((s) => [s.date, s._sum.count ?? 0]));
   const src = fileUrl(m.fileH || m.fileV);
   const yt = m.type === 'youtube' && m.url ? youtubeId(m.url) : null;
@@ -63,8 +65,14 @@ export default async function MidiaPage({ params }: { params: Promise<{ id: stri
             <Bars data={days.map((d) => ({ label: d.slice(8), value: byDate[d] ?? 0, title: `${d}: ${byDate[d] ?? 0}` }))} height={140} highlightMax />
           </section>
           <section className="card p-5">
-            <h2 className="mb-3 font-bold">Reproduzindo em</h2>
-            {screens.length === 0 && <p className="text-sm text-ink-400">Esta mídia ainda não está em nenhuma playlist. Use Editar → Inclusão rápida.</p>}
+            <h2 className="mb-1 font-bold">Telas onde passa</h2>
+            <p className="mb-3 text-xs text-ink-500">Marque as telas onde esta mídia deve passar e clique em Salvar. Desmarcar tira da playlist.</p>
+            <ActionForm action={saveMediaScreens} submit="Salvar telas" className="mb-4 space-y-3">
+              <input type="hidden" name="id" value={m.id} />
+              <ScreensPicker data={data} value={direct} />
+            </ActionForm>
+            <h3 className="mb-1 text-sm font-semibold">Reproduzindo agora em</h3>
+            {screens.length === 0 && <p className="text-sm text-ink-400">Esta mídia ainda não está em nenhuma playlist.</p>}
             <ul className="divide-y divide-ink-100 dark:divide-ink-700">
               {screens.map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2 text-sm">

@@ -5,7 +5,12 @@ import { MediaUpload } from './MediaUpload';
 import { OriginPicker } from './OriginPicker';
 
 type Opt = { id: string; name: string };
-export type MediaFormData = { clients: (Opt & { kind: string })[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[]; remote: boolean };
+export type MediaFormData = { clients: (Opt & { kind: string })[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[]; operations: { label: string; ids: string[] }[]; remote: boolean };
+
+/** Telas onde a midia passa (marcar inclui no fim da playlist; desmarcar tira). */
+export function ScreensPicker({ data, value }: { data: MediaFormData; value: string[] }) {
+  return <MultiPicker name="screens" options={data.screens} defaultValue={value} presets={data.operations} placeholder="Busque pelo nome da tela..." emptyHint="Nenhuma tela cadastrada." />;
+}
 
 function Colors({ fields, cfg }: { fields: [string, string, string][]; cfg: Record<string, string> }) {
   return (
@@ -15,7 +20,7 @@ function Colors({ fields, cfg }: { fields: [string, string, string][]; cfg: Reco
   );
 }
 
-/** Formulario unico para todos os tipos de conteudo (abas Info, Agendamento e Inclusao rapida). */
+/** Formulario unico para todos os tipos de conteudo (abas Info e telas, Agendamento). */
 export function MediaFields({ type, media, data, onScreens = [] }: { type: string; media?: Media; data: MediaFormData; onScreens?: string[] }) {
   const m = media;
   const cfg = parseJson<Record<string, string>>(m?.config, {});
@@ -90,16 +95,17 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
     </>
   );
   const quick = (
-    <>
+    <div className="space-y-2 rounded-xl border-2 border-brand-300 bg-brand-50/40 p-3 dark:border-ink-600 dark:bg-ink-900">
       <input type="hidden" name="hasScreens" value="1" />
-      <p className="text-sm text-ink-500">Marque as telas que devem exibir este conteúdo. Ele entra no fim da playlist de cada uma.</p>
-      <MultiPicker name="screens" options={data.screens} defaultValue={onScreens} placeholder="Busque pelo nome da tela..." emptyHint="Nenhuma tela cadastrada." />
-    </>
+      <p className="font-semibold">Em quais telas esta mídia vai passar?</p>
+      <p className="text-xs text-ink-500">Marque as telas (ou use os atalhos das operações). A mídia entra no fim da playlist de cada tela marcada; desmarcar tira da playlist.</p>
+      <ScreensPicker data={data} value={onScreens} />
+    </div>
   );
   return (
     <>
       {m ? <input type="hidden" name="id" value={m.id} /> : <input type="hidden" name="type" value={type} />}
-      <Tabs tabs={[{ label: 'Info', content: info }, { label: 'Agendamento', content: schedule }, { label: 'Inclusão rápida', content: quick }]} />
+      <Tabs tabs={[{ label: 'Info e telas', content: <div className="space-y-4">{info}{quick}</div> }, { label: 'Agendamento', content: schedule }]} />
     </>
   );
 }
