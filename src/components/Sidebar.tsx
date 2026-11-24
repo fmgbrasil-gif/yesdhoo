@@ -4,12 +4,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone, KeyRound, FileVideo,
+  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone, KeyRound, FileVideo, CalendarClock, ChevronDown,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
 
-type Notif = { id: string; message: string; link: string | null; read: boolean };
+type Notif = { id: string; message: string; link: string | null; read: boolean; kind?: string };
+
+const NOTIF: Record<string, { icon: typeof Bell; go: string }> = {
+  novo: { icon: Sparkles, go: 'Ir para Conteúdos dinâmicos' },
+  offline: { icon: Monitor, go: 'Ir para a tela' },
+  expirada: { icon: CalendarClock, go: 'Ir para a mídia' },
+};
 type Props = {
   user: { name: string; email: string; image: string | null; role: string; superAdmin: boolean };
   company: { name: string; logo: string | null; brand?: boolean };
@@ -52,6 +58,13 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
   const [mini, setMini] = useState(false);
   const [dark, setDark] = useState(false);
   const [bell, setBell] = useState(false);
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  useEffect(() => { try { setClosed(JSON.parse(localStorage.getItem('yd-nav-closed') ?? '{}')); } catch { /* sem armazenamento */ } }, []);
+  const toggleGroup = (g: string) => setClosed((c) => { const n = { ...c, [g]: !c[g] }; try { localStorage.setItem('yd-nav-closed', JSON.stringify(n)); } catch { /* sem armazenamento */ } return n; });
+  // grupo de cada item (para recolher) e grupos que tem a pagina atual (ficam sempre abertos)
+  let currentGroup = '';
+  const groupOf: string[] = NAV.map((n) => ('group' in n ? (currentGroup = n.group) : currentGroup));
+  const activeGroups = new Set(NAV.map((n, i) => ('href' in n && (path === n.href || path.startsWith(n.href + '/')) ? groupOf[i] : '')).filter(Boolean));
   const unread = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
@@ -94,7 +107,13 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4" aria-label="Principal">
           {NAV.map((n, i) => {
             if ('superAdmin' in n && n.superAdmin && !user.superAdmin) return null;
-            if ('group' in n) return mini ? <hr key={i} className="my-3 border-ink-700" /> : <p key={i} className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-500">{n.group}</p>;
+            if ('group' in n) return mini ? <hr key={i} className="my-3 border-ink-700" /> : (
+              <button key={i} type="button" onClick={() => toggleGroup(n.group)} aria-expanded={!closed[n.group] || activeGroups.has(n.group)}
+                className="flex w-full items-center justify-between rounded-lg px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-500 hover:text-ink-300">
+                {n.group}<ChevronDown size={14} className={`transition-transform ${closed[n.group] && !activeGroups.has(n.group) ? '-rotate-90' : ''}`} />
+              </button>
+            );
+            if (!mini && groupOf[i] && closed[groupOf[i]] && !activeGroups.has(groupOf[i])) return null;
             if ('admin' in n && n.admin && user.role !== 'admin') return null;
             const active = path === n.href || path.startsWith(n.href + '/');
             const Icon = n.icon;
@@ -127,6 +146,7 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
             <button className={`${tool} relative`} title="Notificações" aria-label={`Notificações (${unread} não lidas)`} onClick={() => setBell(!bell)}>
               <Bell size={17} />{unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />}
             </button>
+            {user.role === 'admin' && <Link href="/usuarios" className={tool} title="Usuários" aria-label="Usuários"><Users size={17} /></Link>}
             <button className={tool} title={dark ? 'Modo claro' : 'Modo escuro'} aria-label="Alternar tema" onClick={toggleDark}>{dark ? <Sun size={17} /> : <Moon size={17} />}</button>
             <button className={`${tool} hidden lg:flex`} title={mini ? 'Expandir menu' : 'Recolher menu'} aria-label="Recolher menu" onClick={toggleMini}>{mini ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
             <form action={logout} className={mini ? '' : 'ml-auto'}><button className={tool} title="Sair" aria-label="Sair"><LogOut size={17} /></button></form>
@@ -148,12 +168,19 @@ export function Sidebar({ user, company, favorites, notifications, logout, markR
               {unread > 0 && <form action={markRead}><button className="text-xs font-semibold text-brand-700 dark:text-brand-300">Marcar como lidas</button></form>}
             </div>
             {notifications.length === 0 && <p className="p-4 text-sm text-ink-400">Nenhuma notificação por enquanto.</p>}
-            {notifications.map((n) => (
-              <div key={n.id} className="border-b border-ink-100 px-4 py-3 text-sm last:border-0 dark:border-ink-700">
-                <p className={n.read ? 'text-ink-400' : 'font-medium'}>{n.message}</p>
-                {n.link && <Link href={n.link} className="text-xs font-semibold text-brand-700 dark:text-brand-300">Abrir →</Link>}
-              </div>
-            ))}
+            {notifications.map((n) => {
+              const k = NOTIF[n.kind ?? ''];
+              const Icon = k?.icon ?? Bell;
+              return (
+                <div key={n.id} className="flex gap-3 border-b border-ink-100 px-4 py-3 text-sm last:border-0 dark:border-ink-700">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-ink-900 dark:text-brand-300"><Icon size={16} /></span>
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className={n.read ? 'text-ink-400' : 'font-medium'}>{n.message}</p>
+                    {n.link && <Link href={n.link} className="inline-flex items-center gap-1 rounded-md border border-ink-200 px-2 py-0.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 dark:border-ink-600 dark:text-brand-300 dark:hover:bg-ink-900">{k?.go ?? 'Abrir'} →</Link>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

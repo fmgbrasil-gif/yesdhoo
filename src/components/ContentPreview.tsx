@@ -34,16 +34,16 @@ function Screen({ media, vertical, n, onEmpty }: { media: PlayerMedia; vertical:
 }
 
 /** Botao "Visualizar": abre a previa do conteudo como ele aparece na tela (horizontal ou vertical). */
-export function ContentPreview({ h, v }: { h: PlayerMedia; v: PlayerMedia }) {
+export function ContentPreview({ h, v, inline = false }: { h: PlayerMedia; v: PlayerMedia; inline?: boolean }) {
   const [vertical, setVertical] = useState(false);
   const [n, setN] = useState(0);
   const [empty, setEmpty] = useState(false);
   const media = vertical ? v : h;
   const onEmpty = useCallback(() => setEmpty(true), []);
-  const fullscreen = () => (document.querySelector('[role=dialog] [data-preview]') as HTMLElement | null)?.requestFullscreen?.().catch(() => {});
-  return (
-    <Modal trigger={<><Eye size={15} /> Visualizar</>} triggerClass="btn-ghost shrink-0" titleAttr="Visualizar" title={`Prévia — ${h.name}`} wide>
-      <div className="space-y-3">
+  const box = useRef<HTMLDivElement>(null);
+  const fullscreen = () => (box.current?.querySelector('[data-preview]') as HTMLElement | null)?.requestFullscreen?.().catch(() => {});
+  const body = (
+      <div ref={box} className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex gap-1 rounded-lg bg-ink-100 p-1 dark:bg-ink-900" role="radiogroup" aria-label="Orientação da tela">
             {[['Horizontal', false], ['Vertical', true]].map(([l, val]) => (
@@ -62,6 +62,11 @@ export function ContentPreview({ h, v }: { h: PlayerMedia; v: PlayerMedia }) {
           : <Screen key={`${vertical}-${n}`} media={media} vertical={vertical} n={n} onEmpty={onEmpty} />}
         <p className="text-xs text-ink-400">É assim que o conteúdo aparece na tela, durante {h.duration} segundos por passagem.{h.type === 'clima' ? ' Sem cidade fixa, o clima mostrado é o do local da primeira tela com mapa.' : ''}</p>
       </div>
+  );
+  if (inline) return body;
+  return (
+    <Modal trigger={<><Eye size={15} /> Visualizar</>} triggerClass="btn-ghost shrink-0" titleAttr="Visualizar" title={`Prévia — ${h.name}`} wide>
+      {body}
     </Modal>
   );
 }

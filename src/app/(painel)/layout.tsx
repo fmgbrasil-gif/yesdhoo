@@ -31,7 +31,7 @@ export default async function PainelLayout({ children }: { children: React.React
         user={{ name: user.name, email: user.email, image: fileUrl(user.image), role: user.role, superAdmin: user.superAdmin }}
         company={{ name: user.tenant.tradeName || user.tenant.name, logo: logoOnDark(fileUrl(user.tenant.logo)), brand: isBrandLogo(user.tenant.logo) }}
         favorites={favorites.map((f) => ({ id: f.id, name: f.name, online: isOnline(f.lastSeenAt) }))}
-        notifications={notifications.map((n) => ({ id: n.id, message: n.message, link: n.link, read: n.read }))}
+        notifications={notifications.map((n) => ({ id: n.id, message: n.message, link: n.link, read: n.read, kind: n.key?.split(':')[0] ?? '' }))}
         logout={logout}
         markRead={markRead}
       />

@@ -1,5 +1,9 @@
 import type { Category, Screen } from '@prisma/client';
-import { MapPin, Monitor, Pencil, RotateCcw, Star, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Calculator, FileText, HardDriveDownload, MapPin, Monitor, Pencil, RotateCcw, Star, Trash2 } from 'lucide-react';
+import { screenPlaylist } from '@/lib/screen-playlist';
+import { ScreenCalculator } from './ScreenCalculator';
+import { MediaDownloads } from './MediaDownloads';
 import { Avatar, StatusDot } from './basic';
 import { ActionButton, ActionForm, Confirm, Modal } from './ui';
 import { ScreenFields } from './ScreenForm';
@@ -11,7 +15,14 @@ import { deleteScreen, resetScreen, toggleFavorite, updateScreen } from '@/app/(
 
 type Opt = { id: string; name: string };
 
-export function ScreenHeader({ screen, categories, clients }: { screen: Screen & { category: Category | null }; categories: Opt[]; clients: Opt[] }) {
+export async function ScreenHeader({ screen, categories, clients }: { screen: Screen & { category: Category | null }; categories: Opt[]; clients: Opt[] }) {
+  const rows = await screenPlaylist(screen.id);
+  const files = rows.filter((r) => r.type === 'arquivo').flatMap((r) => {
+    const ext = (u: string) => u.split('?')[0].match(/\.(\w{2,4})$/)?.[1] ?? (r.kind === 'video' ? 'mp4' : 'jpg');
+    const base = r.name.replace(/[\\/:*?"<>|]+/g, '-').trim();
+    return [[r.fileH, 'horizontal'], [r.fileV, 'vertical']].filter(([k]) => k).map(([k, o]) => ({ name: `${base} (${o}).${ext(k!)}`, url: fileUrl(k)!, label: `${r.typeLabel} ${o}${r.client ? ' · ' + r.client : ''}` }));
+  }).filter((f, i, a) => a.findIndex((x) => x.url === f.url) === i);
+  const weekDays = screen.weekDays ? screen.weekDays.split(',').filter(Boolean).length : 7;
   const on = isOnline(screen.lastSeenAt);
   const slug = slugify(screen.name);
   const address = [screen.road, screen.number, screen.neighborhood, screen.city && `${screen.city}${screen.state ? ' - ' + screen.state : ''}`].filter(Boolean).join(' • ');
@@ -38,6 +49,13 @@ export function ScreenHeader({ screen, categories, clients }: { screen: Screen &
             : <p className="text-sm text-ink-400">Localização não definida. Use Editar → Localização.</p>}
           <p className="mt-3 text-sm text-ink-500">{address || 'Endereço não informado'}</p>
         </Modal>
+        <Modal trigger={<Calculator size={16} />} triggerClass="btn-icon" title={`Calculadora de exibições — ${screen.name}`} titleAttr="Calculadora" wide>
+          <ScreenCalculator rows={rows} workStart={screen.workStart} workEnd={screen.workEnd} days={weekDays} />
+        </Modal>
+        <Modal trigger={<HardDriveDownload size={16} />} triggerClass="btn-icon" title={`Download das mídias — ${screen.name}`} titleAttr="Download das mídias" wide>
+          <MediaDownloads files={files} />
+        </Modal>
+        <Link href={`/relatorio/tela/${screen.id}`} target="_blank" className="btn-icon" title="Relatório de mídias" aria-label="Relatório de mídias"><FileText size={16} /></Link>
         <Modal trigger={<Pencil size={16} />} triggerClass="btn-icon" title="Editar tela" titleAttr="Editar">
           <ActionForm action={updateScreen}><ScreenFields screen={screen} categories={categories} clients={clients} /></ActionForm>
         </Modal>
