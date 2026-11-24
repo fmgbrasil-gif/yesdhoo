@@ -13,6 +13,7 @@ import { ActionForm, Field, Modal } from '@/components/ui';
 import { Notes } from '@/components/Notes';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { saveScreenNotes, sendCommand } from '../actions';
+import { AutoRefresh } from '@/components/AutoRefresh';
 
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
@@ -97,12 +98,14 @@ export default async function TelaPage({ params, searchParams }: { params: Promi
               <Modal trigger={<><Send size={15} /> Enviar comando</>} triggerClass="btn-ghost" title="Enviar comando">
                 <ActionForm action={sendCommand} submit="Enviar">
                   <input type="hidden" name="id" value={id} />
-                  <Field label="Comando" hint="O dispositivo executa o comando na próxima comunicação (até 1 minuto).">
+                  <Field label="Comando" hint="O aparelho recebe o comando em até 20 segundos (se estiver ligado e com internet).">
                     <select name="type" className="input">{Object.entries(COMMANDS).map(([k, c]) => <option key={k} value={k}>{c.label} — {c.hint}</option>)}</select>
                   </Field>
                 </ActionForm>
               </Modal>
             </div>
+            <AutoRefresh active={commands.some((c) => c.status !== 'executado')} />
+            {commands.some((c) => c.status !== 'executado') && <p className="mb-3 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:bg-ink-900 dark:text-brand-300">Aguardando o aparelho receber o comando (até 20 segundos). Esta lista atualiza sozinha.{screen.lastSeenAt && Date.now() - new Date(screen.lastSeenAt).getTime() > 3 * 60_000 ? ' Atenção: a tela está offline; o comando será executado quando ela voltar.' : ''}</p>}
             {commands.length === 0 && <p className="text-sm text-ink-400">Nenhum comando enviado ainda.</p>}
             <ul className="space-y-3">
               {commands.map((c) => (

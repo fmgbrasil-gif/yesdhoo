@@ -410,8 +410,18 @@ export default function Player() {
     if (!token) return;
     doSync().then(beat);
     const hb = setInterval(beat, 60_000);
-    return () => clearInterval(hb);
-  }, [token, doSync, beat]);
+    // consulta leve a cada 20 s: comando remoto ou playlist nova chegam rapido, sem esperar o batimento de 1 minuto
+    const ping = setInterval(async () => {
+      try {
+        const r = await api('/api/player/ping');
+        if (!r.ok) return;
+        const j: { pending: number; version: number } = await r.json();
+        if (j.pending > 0) beat();
+        else if (j.version !== syncRef.current?.version) doSync();
+      } catch { /* sem internet: o batimento trata */ }
+    }, 20_000);
+    return () => { clearInterval(hb); clearInterval(ping); };
+  }, [token, doSync, beat, api]);
 
   useEffect(() => {
     if (!token || !sync) return;
