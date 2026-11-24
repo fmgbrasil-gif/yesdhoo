@@ -20,6 +20,15 @@ export function ScreenFields({ screen, categories, clients }: { screen?: Screen;
                 <label className="flex items-center gap-2"><input type="radio" name="orientation" value="V" defaultChecked={s?.orientation === 'V'} className="accent-violet-500" /> Vertical</label>
               </div>
             </Field>
+            <Field label="Girar a imagem no aparelho" hint="Automático: tela vertical ligada num aparelho que sai deitado (TV box, TV) gira sozinha. Se ficar de cabeça para baixo, escolha a outra direção.">
+              <select name="rotation" defaultValue={s?.rotation ?? 'auto'} className="input">
+                <option value="auto">Automático (recomendado)</option>
+                <option value="90">Girar 90° (sentido horário)</option>
+                <option value="270">Girar 270° (sentido anti-horário)</option>
+                <option value="180">Girar 180° (de cabeça para baixo)</option>
+                <option value="0">Não girar</option>
+              </select>
+            </Field>
             <Field label="Nome"><input name="name" required defaultValue={s?.name} className="input" placeholder="Ex.: Academia Mais Músculo — Recepção" /></Field>
             <Field label="Imagem" hint="Logo ou foto do ponto (opcional)"><input type="file" name="image" accept="image/*" className="input" /></Field>
             <Field label="Cliente / ponto parceiro">

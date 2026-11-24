@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   return Response.json({
     version: screen.playlistVersion,
     screen: {
-      name: screen.name, orientation: screen.orientation, timezone: screen.timezone, updateFrequency: screen.updateFrequency, audioEnabled: screen.audioEnabled,
+      name: screen.name, orientation: screen.orientation, rotation: screen.rotation, timezone: screen.timezone, updateFrequency: screen.updateFrequency, audioEnabled: screen.audioEnabled,
       footer: screen.footerEnabled ? { text: screen.footerText, bg: screen.footerBg, color: screen.footerColor, clock: screen.footerClock, weather: screen.footerWeather } : null,
     },
     slots,

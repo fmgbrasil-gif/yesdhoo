@@ -19,6 +19,7 @@ function screenData(fd: FormData) {
   return {
     name: str(fd, 'name') ?? '',
     orientation: fd.get('orientation') === 'V' ? 'V' : 'H',
+    rotation: ['0', '90', '180', '270'].includes(String(fd.get('rotation'))) ? String(fd.get('rotation')) : 'auto',
     phone1: str(fd, 'phone1'), phone2: str(fd, 'phone2'),
     road: str(fd, 'road'), number: str(fd, 'number'), complement: str(fd, 'complement'), neighborhood: str(fd, 'neighborhood'),
     zipcode: str(fd, 'zipcode'), city: str(fd, 'city'), state: str(fd, 'state'),

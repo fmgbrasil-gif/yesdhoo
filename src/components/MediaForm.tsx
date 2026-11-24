@@ -73,6 +73,7 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
         <>
           <p className="rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">Escolha combinações de cores suaves e legíveis. Muito brilho pode dificultar a leitura.</p>
           {type === 'hora' && <Field label="Imagem / logo" hint="Tamanho sugerido: 600×600px"><input type="file" name="image" accept="image/*" className="input" /></Field>}
+          {type === 'clima' && <Field label="Cidade da previsão" hint="Ex.: Igarapava - SP. Deixe em branco para usar a localização de cada tela."><input name="city" defaultValue={String(cfg.city ?? '')} placeholder="Igarapava - SP" className="input" /></Field>}
           <Colors cfg={cfg} fields={[['bg', 'Cor de fundo', '#1b0c30'], ['color', 'Cor da fonte', '#ffffff']]} />
         </>
       )}

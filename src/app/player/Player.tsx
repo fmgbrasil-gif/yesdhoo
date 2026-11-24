@@ -7,7 +7,7 @@ import { youtubeId } from '@/lib/util';
 type Footer = { text: string; bg: string; color: string; clock: boolean; weather: boolean } | null;
 type Sync = {
   version: number;
-  screen: { name: string; orientation: string; timezone: string; updateFrequency: number; audioEnabled: boolean; footer: Footer };
+  screen: { name: string; orientation: string; rotation?: string; timezone: string; updateFrequency: number; audioEnabled: boolean; footer: Footer };
   slots: PlayerMedia[][];
 };
 type Current = { media: PlayerMedia; n: number } | null;
@@ -77,6 +77,24 @@ function Clock({ tz, style }: { tz: string; style?: CSSProperties }) {
 
 const WEATHER: Record<number, string> = { 0: 'Céu limpo', 1: 'Poucas nuvens', 2: 'Parcialmente nublado', 3: 'Nublado', 45: 'Neblina', 48: 'Neblina', 51: 'Garoa', 53: 'Garoa', 55: 'Garoa', 61: 'Chuva fraca', 63: 'Chuva', 65: 'Chuva forte', 80: 'Pancadas de chuva', 81: 'Pancadas de chuva', 82: 'Temporal', 95: 'Trovoadas', 96: 'Trovoadas', 99: 'Trovoadas' };
 
+/** Icone simples do tempo (SVG, funciona em WebView antigo de TV box). size em unidades --u. */
+function WeatherIcon({ code, size }: { code: number; size: number }) {
+  const sun = code <= 1, partly = code === 2, rain = (code >= 51 && code <= 67) || (code >= 80 && code <= 82), storm = code >= 95, fog = code === 45 || code === 48;
+  const s = `calc(var(--u) * ${size})`;
+  return (
+    <svg viewBox="0 0 64 64" style={{ width: s, height: s }} aria-hidden>
+      {(sun || partly) && <g stroke="#facc15" strokeWidth="4" strokeLinecap="round" fill="#facc15">
+        <circle cx={partly ? 24 : 32} cy={partly ? 24 : 32} r={partly ? 10 : 13} />
+        {!partly && [0, 45, 90, 135, 180, 225, 270, 315].map((a) => <line key={a} x1="32" y1="8" x2="32" y2="13" transform={`rotate(${a} 32 32)`} />)}
+      </g>}
+      {!sun && <path d="M18 48h28a10 10 0 0 0 0-20 14 14 0 0 0-27-3A11 11 0 0 0 18 48z" fill={storm ? '#94a3b8' : '#e5e7eb'} />}
+      {rain && <g stroke="#60a5fa" strokeWidth="4" strokeLinecap="round"><line x1="24" y1="52" x2="21" y2="60" /><line x1="34" y1="52" x2="31" y2="60" /><line x1="44" y1="52" x2="41" y2="60" /></g>}
+      {storm && <path d="M34 46l-8 10h7l-4 8 10-12h-7l4-6z" fill="#facc15" />}
+      {fog && <g stroke="#e5e7eb" strokeWidth="3" strokeLinecap="round"><line x1="14" y1="54" x2="50" y2="54" /><line x1="18" y1="60" x2="46" y2="60" /></g>}
+    </svg>
+  );
+}
+
 /** Slides montados pelo player a partir de dados (aviso, noticias, hora, dolar, clima). */
 export function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: string; api: (p: string) => Promise<Response>; skip: () => void; n: number }) {
   const cfg = media.config as Record<string, string | boolean | undefined>;
@@ -143,13 +161,30 @@ export function Widget({ media, tz, api, skip, n }: { media: PlayerMedia; tz: st
     );
   }
   if (media.type === 'clima') {
-    const d = data as { temp: number; code: number; max: number; min: number; city?: string };
+    const d = data as { temp: number; code: number; max: number; min: number; rain?: number; city?: string; days?: { date: string; code: number; max: number; min: number; rain: number }[] };
+    const next3 = (d.days ?? []).slice(1, 4);
+    const wd = (iso: string) => new Intl.DateTimeFormat('pt-BR', { weekday: 'short', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z')).replace('.', '');
     return (
-      <div style={base}>
-        <p style={label}>{d.city ? `Tempo agora em ${d.city}` : 'Tempo agora'}</p>
-        <p style={{ ...big, fontSize: 'calc(var(--u) * 22)' }}>{d.temp}°C</p>
+      <div style={{ ...base, gap: 'calc(var(--u) * 2.5)' }}>
+        <p style={{ ...label, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.06em' }}>Previsão do tempo{d.city ? ` · ${d.city}` : ''}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'calc(var(--u) * 4)' }}>
+          <WeatherIcon code={d.code} size={20} />
+          <p style={{ ...big, fontSize: 'calc(var(--u) * 20)' }}>{d.temp}°</p>
+        </div>
         <p style={{ fontSize: 'calc(var(--u) * 5.5)', fontWeight: 700 }}>{WEATHER[d.code] ?? 'Tempo instável'}</p>
-        <p style={label}>Máx. {d.max}° · Mín. {d.min}°</p>
+        <p style={label}>Hoje: máx. {d.max}° · mín. {d.min}°{typeof d.rain === 'number' ? ` · chuva ${d.rain}%` : ''}</p>
+        {next3.length > 0 && (
+          <div style={{ display: 'flex', gap: 'calc(var(--u) * 3)', marginTop: 'calc(var(--u) * 2)' }}>
+            {next3.map((x) => (
+              <div key={x.date} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'calc(var(--u) * 1)', padding: 'calc(var(--u) * 2) calc(var(--u) * 3)', borderRadius: 'calc(var(--u) * 2)', background: 'rgba(255,255,255,.1)', minWidth: 'calc(var(--u) * 18)' }}>
+                <p style={{ fontSize: 'calc(var(--u) * 3.4)', fontWeight: 800, textTransform: 'capitalize' }}>{wd(x.date)}</p>
+                <WeatherIcon code={x.code} size={8} />
+                <p style={{ fontSize: 'calc(var(--u) * 3.6)', fontWeight: 800 }}>{x.max}° <span style={{ opacity: 0.7, fontWeight: 600 }}>{x.min}°</span></p>
+                <p style={{ fontSize: 'calc(var(--u) * 2.6)', opacity: 0.8 }}>chuva {x.rain}%</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -255,7 +290,7 @@ export default function Player() {
   const [token, setToken] = useState<string | null | undefined>(undefined);
   const [sync, setSync] = useState<Sync | null>(null);
   const [cur, setCur] = useState<Current>(null);
-  const [rotate, setRotate] = useState(0);
+  const [manualRotate, setRotate] = useState(0);
   const [offline, setOffline] = useState(false);
   const pos = useRef({ slot: -1, n: 0, rot: {} as Record<number, number> });
   const plays = useRef<Record<string, number>>({});
@@ -388,6 +423,12 @@ export default function Player() {
   useEffect(() => { if (sync && !cur) next(); }, [sync, cur, next]);
   useEffect(() => { if (cur) return; const t = setInterval(next, 15_000); return () => clearInterval(t); }, [cur, next]);
 
+  // giro efetivo: o do painel (se escolhido) > o do menu do app > automatico (tela vertical em aparelho deitado, ou o contrario)
+  const [landscape, setLandscape] = useState(true);
+  useEffect(() => { const f = () => setLandscape(innerWidth >= innerHeight); f(); addEventListener('resize', f); return () => removeEventListener('resize', f); }, []);
+  const panelRot = sync?.screen.rotation;
+  const wantV = sync?.screen.orientation === 'V';
+  const rotate = panelRot && panelRot !== 'auto' ? Number(panelRot) : manualRotate ? manualRotate : sync && wantV === landscape ? 90 : 0;
   const turned = rotate === 90 || rotate === 270;
   // Unidades proporcionais ao quadro (1 = 1% do lado). Calculadas em JS para funcionar tambem em WebViews antigos de TV box.
   const [size, setSize] = useState({ w: 1280, h: 720 });

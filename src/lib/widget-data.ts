@@ -2,6 +2,7 @@ import 'server-only';
 import { XMLParser } from 'fast-xml-parser';
 import { db } from '@/lib/db';
 import { cached, isPublicUrl } from '@/lib/player';
+import { parseJson } from '@/lib/util';
 
 const get = (url: string) => fetch(url, { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DOOH-Player/1.0)' } });
 const text = (v: unknown): string => (typeof v === 'string' ? v : v && typeof v === 'object' && '#text' in v ? String((v as { '#text': unknown })['#text']) : '');
@@ -40,14 +41,22 @@ export async function widgetData(kind: string | null, id: string, place: WidgetP
     return data ?? {};
   }
   if (kind === 'clima') {
-    if (place.latitude == null || place.longitude == null) return {};
-    const { latitude: la, longitude: lo } = place;
-    const data = await cached(`clima:${la.toFixed(2)},${lo.toFixed(2)}`, 30, async () => {
-      const j = await (await get(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`)).json();
+    // cidade fixa na midia (ex.: Igarapava/SP) ou, sem ela, a localizacao de cada tela
+    const media = id ? await db.media.findFirst({ where: { id, type: 'clima', OR: [{ tenantId: place.tenantId }, { tenantId: null }] } }) : null;
+    const cfg = parseJson<{ city?: string; lat?: number; lon?: number }>(media?.config, {});
+    const fixed = typeof cfg.lat === 'number' && typeof cfg.lon === 'number';
+    const la = fixed ? cfg.lat! : place.latitude;
+    const lo = fixed ? cfg.lon! : place.longitude;
+    if (la == null || lo == null) return {};
+    const city = fixed ? cfg.city ?? null : place.city;
+    const data = await cached(`clima4:${la.toFixed(2)},${lo.toFixed(2)}`, 30, async () => {
+      const j = await (await get(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=America%2FSao_Paulo&forecast_days=4`)).json();
       if (typeof j?.current?.temperature_2m !== 'number') throw new Error('clima');
-      return { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code as number, max: Math.round(j.daily.temperature_2m_max[0]), min: Math.round(j.daily.temperature_2m_min[0]), city: place.city };
+      const d = j.daily;
+      const days = (d.time as string[]).map((date, i) => ({ date, code: d.weather_code[i] as number, max: Math.round(d.temperature_2m_max[i]), min: Math.round(d.temperature_2m_min[i]), rain: Number(d.precipitation_probability_max?.[i] ?? 0) }));
+      return { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code as number, max: days[0].max, min: days[0].min, rain: days[0].rain, days };
     });
-    return data ?? {};
+    return data ? { ...data, city } : {};
   }
   return null;
 }

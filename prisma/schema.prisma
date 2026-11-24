@@ -278,6 +278,7 @@ model Screen {
   name            String
   image           String?
   orientation     String    @default("H") // H | V
+  rotation        String    @default("auto") // auto | 0 | 90 | 180 | 270 (giro da imagem no aparelho)
   categoryId      String?
   category        Category? @relation(fields: [categoryId], references: [id])
   clientId        String?

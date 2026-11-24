@@ -60,7 +60,7 @@ export function ContentPreview({ h, v }: { h: PlayerMedia; v: PlayerMedia }) {
         {empty
           ? <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800">{h.type === 'clima' ? 'Sem previsão do tempo para mostrar: marque a localização de uma tela no mapa (em Minhas telas). Na TV, o clima usa o local de cada tela.' : 'A fonte deste conteúdo não respondeu agora. Na TV, ele é pulado até voltar.'}</p>
           : <Screen key={`${vertical}-${n}`} media={media} vertical={vertical} n={n} onEmpty={onEmpty} />}
-        <p className="text-xs text-ink-400">É assim que o conteúdo aparece na tela, durante {h.duration} segundos por passagem.{h.type === 'clima' ? ' O clima mostrado é o do local da primeira tela com mapa.' : ''}</p>
+        <p className="text-xs text-ink-400">É assim que o conteúdo aparece na tela, durante {h.duration} segundos por passagem.{h.type === 'clima' ? ' Sem cidade fixa, o clima mostrado é o do local da primeira tela com mapa.' : ''}</p>
       </div>
     </Modal>
   );

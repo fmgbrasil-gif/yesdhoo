@@ -95,6 +95,15 @@ export async function saveMedia(_: ActionResult, fd: FormData): Promise<ActionRe
   if (type === 'aviso') Object.assign(cfg, { title: name, showTitle: bool(fd, 'showTitle'), text: str(fd, 'text') ?? '', bg: str(fd, 'bg'), titleColor: str(fd, 'titleColor'), textColor: str(fd, 'textColor'), fontSize: str(fd, 'fontSize') ?? 'padrao' });
   if (type === 'rss') Object.assign(cfg, { source: str(fd, 'source') ?? '', bg: str(fd, 'bg'), color: str(fd, 'color') });
   if (['hora', 'dolar', 'clima'].includes(type)) Object.assign(cfg, { bg: str(fd, 'bg'), color: str(fd, 'color') });
+  if (type === 'clima') {
+    const city = str(fd, 'city');
+    if (!city) { delete cfg.city; delete cfg.lat; delete cfg.lon; }
+    else if (city !== cfg.city || typeof cfg.lat !== 'number') {
+      const place = await geocodeCity(city);
+      if (!place) return { error: `Não encontrei a cidade "${city}". Escreva assim: Igarapava - SP.` };
+      Object.assign(cfg, place);
+    }
+  }
   if (['aviso', 'rss', 'hora'].includes(type) && isUpload(fd.get('image'))) {
     await removeFile(cfg.image as string | undefined);
     cfg.image = await saveFile(fd.get('image') as File, 'midias');
@@ -190,4 +199,22 @@ export async function deleteGroup(_: ActionResult, fd: FormData): Promise<Action
   await removeFile(g.image);
   revalidatePath('/', 'layout');
   return { ok: true };
+}
+
+/** Acha a cidade (Brasil) para a previsao do tempo. Aceita "Cidade - UF", "Cidade/UF" ou so "Cidade". */
+async function geocodeCity(input: string): Promise<{ city: string; lat: number; lon: number } | null> {
+  const [rawName, rawUf] = input.split(/\s*[-/,]\s*/);
+  const uf = rawUf?.trim().toUpperCase();
+  const UF: Record<string, string> = { AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará', DF: 'Distrito Federal', ES: 'Espírito Santo', GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', MG: 'Minas Gerais', PA: 'Pará', PB: 'Paraíba', PR: 'Paraná', PE: 'Pernambuco', PI: 'Piauí', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte', RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins' };
+  try {
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(rawName.trim())}&count=10&language=pt&countryCode=BR`, { signal: AbortSignal.timeout(8000) });
+    const j = (await res.json()) as { results?: { name: string; latitude: number; longitude: number; admin1?: string }[] };
+    const list = j.results ?? [];
+    const hit = (uf && UF[uf] ? list.find((r) => r.admin1 === UF[uf]) : null) ?? list[0];
+    if (!hit) return null;
+    const sigla = Object.keys(UF).find((k) => UF[k] === hit.admin1);
+    return { city: `${hit.name}${sigla ? '/' + sigla : ''}`, lat: hit.latitude, lon: hit.longitude };
+  } catch {
+    return null;
+  }
 }
