@@ -70,7 +70,7 @@ export default async function TelaPage({ params, searchParams }: { params: Promi
                   <p className="font-semibold">Ainda não instalou o app no TV box?</p>
                   <a href="/app" target="_blank" rel="noreferrer" className="btn-primary !py-1.5"><Smartphone size={15} /> Baixar app da TV</a>
                   <p className="break-all text-xs text-ink-400">{appUrl}</p>
-                  <p className="text-xs text-ink-400">Sem TV box? Abra <Link href="/player" target="_blank" className="font-semibold underline">{origin}/player</Link> em qualquer navegador.</p>
+                  <p className="text-xs text-ink-400">TV LG ou Samsung (sem Android)? Abra <Link href="/player" target="_blank" className="font-semibold underline">{origin}/player</Link> no navegador da TV. <a href="/app#navegador" target="_blank" rel="noreferrer" className="font-semibold text-brand-600 underline">Ver passo a passo</a></p>
                 </div>
               </div>
             </section>
