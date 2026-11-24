@@ -14,6 +14,8 @@ type Current = { media: PlayerMedia; n: number } | null;
 
 const LS = { token: 'yd-player-token', data: 'yd-player-data', rotate: 'yd-player-rotate', executed: 'yd-player-executed' };
 const CACHE = 'yd-media-v1';
+// imagem transparente de 1px: evita o icone de "play" cinza que o Android mostra antes do video comecar
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 const full: CSSProperties = { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' };
 const center: CSSProperties = { ...full, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 'calc(var(--u) * 6)', gap: 'calc(var(--u) * 3)' };
 
@@ -168,7 +170,7 @@ function Stage({ cur, sync, api, next }: { cur: NonNullable<Current>; sync: Sync
   if (media.type === 'arquivo') {
     if (!src) return null;
     return isVideo
-      ? <video key={cur.n} src={src} autoPlay playsInline muted={!sync.screen.audioEnabled} onEnded={next} onError={fail} style={{ ...full, objectFit: 'contain', background: '#000' }} />
+      ? <video key={cur.n} src={src} poster={BLANK} autoPlay playsInline muted={!sync.screen.audioEnabled} onEnded={next} onError={fail} style={{ ...full, objectFit: 'contain', background: '#000' }} />
       : <img src={src} alt="" onError={fail} style={{ ...full, objectFit: 'contain', background: '#000' }} />; // eslint-disable-line @next/next/no-img-element
   }
   if (media.type === 'youtube') {

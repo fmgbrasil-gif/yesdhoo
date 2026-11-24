@@ -52,11 +52,12 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const user = await requireUser();
   const { page, size, skip, take } = pageParams(sp);
-  const kind = sp.tipo === 'parceiro' || sp.tipo === 'cliente' ? sp.tipo : undefined;
+  // padrao: so clientes; parceiros e todos pelas abas
+  const kind = sp.tipo === 'parceiro' ? 'parceiro' : sp.tipo === 'todos' ? undefined : 'cliente';
   const where = { tenantId: user.tenantId, ...(kind ? { kind } : {}), ...(sp.q ? { name: like(sp.q) } : {}), ...(sp.doc ? { document: sp.doc.replace(/\D/g, '') } : {}) };
   const counts = Object.fromEntries((await db.client.groupBy({ by: ['kind'], where: { tenantId: user.tenantId }, _count: true })).map((g) => [g.kind, g._count]));
   const tab = (k: string | undefined, label: string, n: number) => (
-    <Link href={k ? `/clientes?tipo=${k}` : '/clientes'} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${kind === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label} <span className="opacity-70">{n}</span></Link>
+    <Link href={k === 'cliente' ? '/clientes' : `/clientes?tipo=${k ?? 'todos'}`} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${kind === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label} <span className="opacity-70">{n}</span></Link>
   );
   const [rows, total] = await Promise.all([
     db.client.findMany({ where, skip, take, orderBy: [{ active: 'desc' }, { name: 'asc' }], include: { _count: { select: { medias: true } }, subscriptions: { where: { status: 'ativa' }, select: { amountCents: true, mode: true } } } }),
@@ -68,9 +69,9 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
         <Link href="/financeiro/nova" className="btn-primary" title="Clientes novos são cadastrados pela Nova cobrança, junto com a cobrança e o contrato"><Plus size={16} /> Novo cliente</Link>
       </PageHeader>
       <div className="card overflow-hidden">
-        <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">{tab(undefined, 'Todos', (counts.cliente ?? 0) + (counts.parceiro ?? 0))}{tab('cliente', 'Clientes', counts.cliente ?? 0)}{tab('parceiro', 'Parceiros', counts.parceiro ?? 0)}</div>
+        <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">{tab('cliente', 'Clientes', counts.cliente ?? 0)}{tab('parceiro', 'Parceiros', counts.parceiro ?? 0)}{tab(undefined, 'Todos', (counts.cliente ?? 0) + (counts.parceiro ?? 0))}</div>
         <form className="flex flex-wrap gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
-          {kind && <input type="hidden" name="tipo" value={kind} />}
+          <input type="hidden" name="tipo" value={kind ?? 'todos'} />
           <input name="q" defaultValue={sp.q} placeholder="Buscar por nome..." className="input w-56" aria-label="Nome" />
           <input name="doc" defaultValue={sp.doc} placeholder="Buscar por CPF/CNPJ..." className="input w-56" aria-label="CPF/CNPJ" />
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>
