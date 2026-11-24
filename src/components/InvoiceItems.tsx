@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, X } from 'lucide-react';
 import { centsToText, MoneyInput } from './MoneyInput';
 import { createService, deleteService } from '@/app/(painel)/financeiro/services';
@@ -13,7 +13,13 @@ const brl = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency'
 const empty = (): Row => ({ description: '', unit: 'mês', quantity: '1', unit_price: '0,00' });
 
 /** Linhas da fatura (descricao, unidade, quantidade, valor) com total ao vivo e atalho para o catalogo de servicos. */
-export function InvoiceItems({ initial, services: initialServices = [] }: { initial?: { description: string; unit?: string; quantity: number; unitCents: number }[]; services?: ServiceOpt[] }) {
+export function InvoiceItems({ initial, services: initialServices = [], suggest, extraSuggestions = [] }: {
+  initial?: { description: string; unit?: string; quantity: number; unitCents: number }[]; services?: ServiceOpt[];
+  /** descricao sugerida (ex.: ao escolher a operacao); so preenche a 1a linha se estiver vazia ou com a sugestao anterior */
+  suggest?: string;
+  /** outras sugestoes para o campo Descricao (ex.: uma por operacao) */
+  extraSuggestions?: string[];
+}) {
   const [rows, setRows] = useState<Row[]>(initial?.length
     ? initial.map((i) => ({ description: i.description, unit: i.unit ?? 'un', quantity: String(i.quantity).replace('.', ','), unit_price: centsToText(i.unitCents) }))
     : [empty()]);
@@ -21,6 +27,12 @@ export function InvoiceItems({ initial, services: initialServices = [] }: { init
   const [picker, setPicker] = useState(false);
   const [draft, setDraft] = useState({ name: '', unit: 'mês', price: '0,00' });
   const [msg, setMsg] = useState('');
+  const [lastSuggest, setLastSuggest] = useState('');
+  useEffect(() => {
+    if (!suggest) return;
+    setRows((rs) => (rs[0] && (!rs[0].description || rs[0].description === lastSuggest) ? [{ ...rs[0], description: suggest }, ...rs.slice(1)] : rs));
+    setLastSuggest(suggest);
+  }, [suggest]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (i: number, k: keyof Row, v: string) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   // descricao igual a um servico cadastrado (escolhido na lista): preenche unidade e valor
   const setDescription = (i: number, v: string) => {
@@ -53,7 +65,7 @@ export function InvoiceItems({ initial, services: initialServices = [] }: { init
 
   return (
     <div className="space-y-2">
-      <datalist id="servicos-cadastrados">{services.map((s) => <option key={s.id} value={s.name}>{`${brl(s.priceCents)} / ${s.unit}`}</option>)}</datalist>
+      <datalist id="servicos-cadastrados">{services.map((s) => <option key={s.id} value={s.name}>{`${brl(s.priceCents)} / ${s.unit}`}</option>)}{extraSuggestions.filter((x) => !services.some((s) => s.name === x)).map((x) => <option key={x} value={x}>operação</option>)}</datalist>
       <input type="hidden" name="items" value={JSON.stringify(rows.map((r) => ({ description: r.description, unit: r.unit, quantity: r.quantity, price: r.unit_price })))} />
       <div className="hidden grid-cols-[1fr_70px_60px_130px_28px] gap-2 sm:grid"><span className="label">Descrição</span><span className="label">Unid.</span><span className="label">Qtd.</span><span className="label">Valor unit.</span></div>
       {rows.map((r, i) => (

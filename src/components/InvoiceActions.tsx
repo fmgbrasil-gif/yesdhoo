@@ -6,6 +6,8 @@ import { invoiceItems, invoiceLink, METHODS } from '@/lib/billing';
 import { suggestedAccount } from '@/lib/cash';
 import { ActionForm, Confirm, Field, Modal } from './ui';
 import { InvoiceItems, type ServiceOpt } from './InvoiceItems';
+import { OperationAccountFields, type AccountOpt, type OpOpt } from './ChargeForm';
+import { opDescription } from '@/lib/op-text';
 import { MoneyInput } from './MoneyInput';
 import { PixButton } from './PixPanel';
 import { boletoInvoice, cancelCharge, cancelInvoice, payInvoice, reactivateInvoice, reopenInvoice, syncInvoice, updateInvoice } from '@/app/(painel)/financeiro/actions';
@@ -17,7 +19,7 @@ export type InvoiceRow = Invoice & {
 };
 
 /** Todos os botoes de uma fatura (Financeiro e Contas a receber). */
-export function InvoiceActions({ inv, today, accounts, services, hasBank }: { inv: InvoiceRow; today: string; accounts: { id: string; name: string }[]; services: ServiceOpt[]; hasBank: boolean }) {
+export function InvoiceActions({ inv, today, accounts, operations = [], services, hasBank }: { inv: InvoiceRow; today: string; accounts: AccountOpt[]; operations?: OpOpt[]; services: ServiceOpt[]; hasBank: boolean }) {
   return (
     <div className="flex flex-wrap justify-end gap-1.5">
       <Link href={invoiceLink(inv)} target="_blank" className="btn-icon" title="Abrir fatura (link para o cliente)" aria-label="Abrir fatura"><FileText size={15} /></Link>
@@ -53,8 +55,9 @@ export function InvoiceActions({ inv, today, accounts, services, hasBank }: { in
             <Modal trigger={<Pencil size={15} />} triggerClass="btn-icon" titleAttr="Editar fatura" title={`Editar fatura ${inv.number}`} wide>
               <ActionForm action={updateInvoice}>
                 <input type="hidden" name="id" value={inv.id} />
+                  <OperationAccountFields operations={operations} accounts={accounts} operationId={inv.operationId} accountId={inv.accountId} />
                 <Field label="Vencimento"><input type="date" name="dueDate" required defaultValue={inv.dueDate} className="input" /></Field>
-                <InvoiceItems initial={invoiceItems(inv)} services={services} />
+                <InvoiceItems initial={invoiceItems(inv)} services={services} extraSuggestions={operations.map((o) => opDescription(o.name))} />
                 <Field label="Observações"><textarea name="notes" rows={2} defaultValue={inv.notes} className="input" /></Field>
               </ActionForm>
             </Modal>

@@ -11,16 +11,17 @@ export const maxDuration = 300;
 
 export default async function NovaCobrancaPage() {
   const user = await requireAdmin();
-  const [clients, services, ops, screens] = await Promise.all([
+  const [clients, services, ops, screens, accounts] = await Promise.all([
     db.client.findMany({ where: { tenantId: user.tenantId, active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
     db.service.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true, unit: true, priceCents: true } }),
-    db.operation.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true, screens: { select: { id: true } } } }),
+    db.operation.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: 'asc' }, select: { id: true, name: true, accountId: true, screens: { select: { id: true } } } }),
     screenOptions(user.tenantId),
+    db.bankAccount.findMany({ where: { tenantId: user.tenantId, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true, isDefault: true } }),
   ]);
   return (
     <>
       <PageHeader title="Nova cobrança" crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Nova cobrança' }]} />
-      <ChargeWizard clients={clients} services={services} operations={ops.map((o) => ({ id: o.id, name: o.name, screenIds: o.screens.map((s) => s.id) }))} screens={screens} today={localDate()} hasAi={!!openaiKey(user.tenant)} />
+      <ChargeWizard clients={clients} services={services} operations={ops.map((o) => ({ id: o.id, name: o.name, accountId: o.accountId, screenIds: o.screens.map((s) => s.id) }))} accounts={accounts} screens={screens} today={localDate()} hasAi={!!openaiKey(user.tenant)} />
     </>
   );
 }

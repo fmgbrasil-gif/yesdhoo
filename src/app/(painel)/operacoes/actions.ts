@@ -6,7 +6,7 @@ import { db } from '@/lib/db';
 import { str } from '@/lib/util';
 import type { ActionResult } from '@/components/ui';
 
-export type OperationOpt = { id: string; name: string; screenIds: string[] };
+export type OperationOpt = { id: string; name: string; screenIds: string[]; accountId?: string | null };
 
 /** Cria ou edita uma operacao (nome + pontos/telas que ela contempla). Usado pela pagina e pelo assistente de cobranca. */
 export async function upsertOperation(fd: FormData): Promise<{ ok: false; error: string } | { ok: true; operation: OperationOpt }> {

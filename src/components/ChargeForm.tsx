@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Field } from './ui';
 import { InvoiceItems, type ServiceOpt } from './InvoiceItems';
+import { opDescription } from '@/lib/op-text';
 
 type Opt = { id: string; name: string; kind: string };
 const MODES = [
@@ -12,8 +13,46 @@ const MODES = [
 ] as const;
 
 /** Campos da nova cobranca; o tipo escolhido mostra os campos de data certos. */
-export function ChargeFields({ clients, today, services, fixedClient, operations }: { clients: Opt[]; today: string; services: ServiceOpt[]; fixedClient?: { id: string; name: string }; operations?: { id: string; name: string }[] }) {
+export type OpOpt = { id: string; name: string; accountId?: string | null };
+export type AccountOpt = { id: string; name: string; isDefault?: boolean };
+
+/** Operacao e caixa que recebe (no inicio da cobranca): ao escolher a operacao, o caixa dela vem marcado. */
+export function OperationAccountFields({ operations = [], accounts = [], operationId, accountId, onOperation }: {
+  operations?: OpOpt[]; accounts?: AccountOpt[]; operationId?: string | null; accountId?: string | null; onOperation?: (op: OpOpt | null) => void;
+}) {
+  const fallback = accounts.find((a) => a.isDefault)?.id ?? accounts[0]?.id ?? '';
+  const [op, setOp] = useState(operationId ?? '');
+  const [acc, setAcc] = useState(accountId ?? operations.find((o) => o.id === operationId)?.accountId ?? fallback);
+  if (!operations.length && !accounts.length) return null;
+  return (
+    <div className="grid gap-3 rounded-xl border-2 border-brand-200 bg-brand-50/40 p-3 sm:col-span-3 sm:grid-cols-2 dark:border-ink-600 dark:bg-ink-900">
+      {operations.length > 0 && (
+        <Field label="Operação" hint="Os pontos da operação entram no contrato; a descrição é sugerida">
+          <select name="operationId" value={op} className="input" onChange={(e) => {
+            const o = operations.find((x) => x.id === e.target.value) ?? null;
+            setOp(e.target.value);
+            if (o?.accountId && accounts.some((a) => a.id === o.accountId)) setAcc(o.accountId);
+            onOperation?.(o);
+          }}>
+            <option value="">Sem operação</option>
+            {operations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          </select>
+        </Field>
+      )}
+      {accounts.length > 0 && (
+        <Field label="Caixa que recebe" hint="Os pagamentos desta cobrança entram neste caixa">
+          <select name="accountId" value={acc} onChange={(e) => setAcc(e.target.value)} className="input">
+            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.isDefault ? ' (padrão)' : ''}</option>)}
+          </select>
+        </Field>
+      )}
+    </div>
+  );
+}
+
+export function ChargeFields({ clients, today, services, fixedClient, operations, accounts, defaultOperationId }: { clients: Opt[]; today: string; services: ServiceOpt[]; fixedClient?: { id: string; name: string }; operations?: OpOpt[]; accounts?: AccountOpt[]; defaultOperationId?: string | null }) {
   const [mode, setMode] = useState<(typeof MODES)[number]['key']>('recorrente');
+  const [suggest, setSuggest] = useState<string | undefined>(undefined);
   const month = today.slice(0, 7);
   return (
     <>
@@ -29,6 +68,7 @@ export function ChargeFields({ clients, today, services, fixedClient, operations
         <p className="mt-1 text-xs text-ink-400">{MODES.find((m) => m.key === mode)!.hint}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
+        <OperationAccountFields operations={operations} accounts={accounts} operationId={defaultOperationId} onOperation={(o) => setSuggest(o ? opDescription(o.name) : undefined)} />
         {fixedClient ? (
           <div className="sm:col-span-3"><input type="hidden" name="clientId" value={fixedClient.id} /><span className="label">Cliente</span><p className="font-semibold">{fixedClient.name}</p></div>
         ) : <Field label="Cliente ou parceiro" className="sm:col-span-3">
@@ -41,11 +81,6 @@ export function ChargeFields({ clients, today, services, fixedClient, operations
             ))}
           </select>
         </Field>}
-        {operations && operations.length > 0 && (
-          <Field label="Operação (opcional)" hint="Define em qual caixa os pagamentos entram" className="sm:col-span-3">
-            <select name="operationId" className="input" defaultValue=""><option value="">Sem operação (caixa padrão)</option>{operations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>
-          </Field>
-        )}
         {mode === 'avulsa' ? (
           <Field label="Vencimento"><input type="date" name="dueDate" required className="input" defaultValue={today} /></Field>
         ) : (
@@ -57,7 +92,7 @@ export function ChargeFields({ clients, today, services, fixedClient, operations
         )}
       </div>
       <p className="label -mb-1">{mode === 'avulsa' ? 'Itens da fatura' : 'Itens de cada mês'}</p>
-      <InvoiceItems services={services} />
+      <InvoiceItems services={services} suggest={suggest} extraSuggestions={(operations ?? []).map((o) => opDescription(o.name))} />
       <Field label="Observações (aparecem nas faturas)"><textarea name="notes" rows={2} className="input" /></Field>
     </>
   );

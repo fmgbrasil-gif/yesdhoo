@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Check, Download, ExternalLink, FileSearch, FileSignature, Loader2, Mail, MessageCircle, Plus, Receipt, Send, SkipForward, UserPlus, Users } from 'lucide-react';
-import { ChargeFields } from './ChargeForm';
+import { ChargeFields, type AccountOpt } from './ChargeForm';
 import { PixPanel } from './PixPanel';
 import { CnpjLookup } from './CnpjLookup';
 import { CopyButton } from './CopyButton';
@@ -72,8 +72,8 @@ function ClientFields({ d }: { d: Partial<ClientDraft> }) {
  * Nova cobranca em etapas: cliente (cadastro lido dos documentos) -> cobranca -> contrato basico da operacao
  * -> fatura com Pix -> envio (WhatsApp, e-mail ou PDFs) do que estiver marcado.
  */
-export function ChargeWizard({ clients, services, operations: initialOps, screens, today, hasAi }: {
-  clients: Opt[]; services: ServiceOpt[]; operations: OperationOpt[]; screens: ScreenOpt[]; today: string; hasAi: boolean;
+export function ChargeWizard({ clients, services, operations: initialOps, screens, today, hasAi, accounts = [] }: {
+  clients: Opt[]; services: ServiceOpt[]; operations: OperationOpt[]; screens: ScreenOpt[]; today: string; hasAi: boolean; accounts?: AccountOpt[];
 }) {
   const [step, setStep] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
@@ -136,8 +136,10 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   const submitCharge = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const chosenOp = String(fd.get('operationId') ?? '');
     run(async () => {
       const r = await wizardCharge(fd);
+      if (r.ok && chosenOp) setOpId(chosenOp); // ja vem marcada na etapa do contrato
       if (!r.ok) { setError(r.error); return; }
       setCharge(r); if (r.invoiceId && !r.subscriptionId) setInvoiceId(r.invoiceId); go(2);
     });
@@ -281,7 +283,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
       {step === 1 && client && !charge && (
         <form onSubmit={submitCharge} className="space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-bold"><Receipt size={18} /> Cobrança</h2>
-          <ChargeFields clients={clients} today={today} services={services} fixedClient={client} />
+          <ChargeFields clients={clients} today={today} services={services} fixedClient={client} operations={ops} accounts={accounts} defaultOperationId={opId || null} />
           <div className="flex justify-between gap-2">
             <button type="button" className="btn-ghost" onClick={() => go(0)} disabled={busy}>Voltar</button>
             <button className="btn-primary" disabled={busy}>{busy && <Loader2 size={15} className="animate-spin" />}Criar cobrança e avançar</button>

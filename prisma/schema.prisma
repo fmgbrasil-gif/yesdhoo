@@ -168,6 +168,8 @@ model Subscription {
   notes        String    @default("")
   operationId  String?
   operation    Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  accountId    String?   // caixa que recebe os pagamentos (escolhido na cobranca)
+  account      BankAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   invoices     Invoice[]
@@ -262,6 +264,8 @@ model Invoice {
   updatedAt    DateTime  @updatedAt
   operationId  String?
   operation    Operation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  accountId    String?   // caixa que recebe o pagamento desta fatura
+  account      BankAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
   @@unique([tenantId, number])
   @@unique([subscriptionId, competence])
   @@index([tenantId, status, dueDate])
@@ -459,6 +463,8 @@ model BankAccount {
   entries      CashEntry[]
   payables     Payable[]
   operations   Operation[]
+  invoices     Invoice[]
+  subscriptions Subscription[]
   @@index([tenantId])
 }
 

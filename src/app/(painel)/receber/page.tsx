@@ -26,8 +26,8 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
   const tid = user.tenantId;
   const [{ list, totals }, operations, accounts, services, clients, subs] = await Promise.all([
     openDebts(tid, f),
-    db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true } }),
+    db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true, accountId: true } }),
+    db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true, isDefault: true } }),
     db.service.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true, unit: true, priceCents: true } }),
     db.client.findMany({ where: { tenantId: tid, active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
     db.subscription.findMany({ where: { tenantId: tid, status: 'ativa' }, orderBy: { createdAt: 'desc' }, include: { client: { select: { name: true } } } }),
@@ -69,7 +69,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
       <PageHeader title="Contas a receber" crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Contas a receber' }]}>
         <a href={`/relatorio/receber${qs ? `?${qs}` : ''}`} target="_blank" rel="noreferrer" className="btn-ghost"><Printer size={16} /> Gerar relatório</a>
         <a href={`/relatorio/receber/planilha${qs ? `?${qs}` : ''}`} className="btn-ghost"><FileDown size={16} /> Planilha (CSV)</a>
-        <FinanceButtons clients={clients} subs={subs} services={services} operations={operations} today={today} />
+        <FinanceButtons clients={clients} subs={subs} services={services} operations={operations} accounts={accounts} today={today} />
       </PageHeader>
 
       <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
@@ -135,7 +135,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
                           <td className={`td ${i.late ? 'font-semibold text-red-600' : ''}`}>{fmtDate(i.dueDate)}</td>
                           <td className="td">{i.state === 'paga' ? <span className="badge bg-emerald-100 text-emerald-700">Paga</span> : i.state === 'cancelada' ? <span className="badge bg-ink-100 text-ink-500">Cancelada</span> : i.late ? `${i.late} dia(s)` : '—'}</td>
                           <td className="td text-right font-semibold tabular-nums">{fmtMoney(i.amountCents)}</td>
-                          <td className="td"><InvoiceActions inv={i.inv} today={today} accounts={accounts} services={services} hasBank={hasBank} /></td>
+                          <td className="td"><InvoiceActions inv={i.inv} today={today} accounts={accounts} operations={operations} services={services} hasBank={hasBank} /></td>
                         </tr>
                       ))}
                     </tbody>
@@ -152,7 +152,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
                           </div>
                           <p className="shrink-0 font-black tabular-nums">{fmtMoney(i.amountCents)}</p>
                         </div>
-                        <InvoiceActions inv={i.inv} today={today} accounts={accounts} services={services} hasBank={hasBank} />
+                        <InvoiceActions inv={i.inv} today={today} accounts={accounts} operations={operations} services={services} hasBank={hasBank} />
                       </li>
                     ))}
                   </ul>

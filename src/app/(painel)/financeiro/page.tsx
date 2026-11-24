@@ -13,6 +13,8 @@ import { InvoiceItems } from '@/components/InvoiceItems';
 import { MoneyInput } from '@/components/MoneyInput';
 import { InvoiceActions } from '@/components/InvoiceActions';
 import { FinanceButtons } from '@/components/FinanceButtons';
+import { OperationAccountFields } from '@/components/ChargeForm';
+import { opDescription } from '@/lib/op-text';
 import { PeriodBar } from '@/components/PeriodBar';
 import { periodHref, resolvePeriod } from '@/lib/period';
 
@@ -33,8 +35,8 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const { page, size, skip, take } = pageParams(sp);
   // padrao: Em aberto (tudo o que nao foi pago); "todas" mostra tudo menos o arquivo morto
   const status = sp.situacao === 'todas' ? '' : sp.situacao || 'aberta';
-  const accounts = await db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true } });
-  const operations = await db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
+  const accounts = await db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true, isDefault: true } });
+  const operations = await db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true, accountId: true } });
   // periodo de consulta: um mes (padrao: o atual), um intervalo personalizado ou todo o periodo
   const per = resolvePeriod(sp, today);
   const { de, ate } = per;
@@ -81,7 +83,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title="Financeiro" crumbs={[{ label: 'Financeiro' }, { label: 'Contas a receber' }]}>
-        <FinanceButtons clients={clients} subs={activeSubs} services={services} operations={operations} today={today} />
+        <FinanceButtons clients={clients} subs={activeSubs} services={services} operations={operations} accounts={accounts} today={today} />
       </PageHeader>
 
       {noPix && <p className="mb-4 rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-800 dark:text-ink-200">Cadastre sua chave Pix em <Link href="/empresa#cobranca" className="font-semibold underline">Minha empresa</Link> para que as faturas saiam com QR Code de pagamento.</p>}
@@ -124,8 +126,9 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                                 <ActionForm action={updateCharge}>
                                   <input type="hidden" name="id" value={s.id} />
                                   <p className="text-sm text-ink-500">{SUB_MODE(s)} desde {competenceLabel(s.startMonth)}. As mudanças valem para as próximas faturas.</p>
+                                  <OperationAccountFields operations={operations} accounts={accounts} operationId={s.operationId} accountId={s.accountId} />
                                   <Field label="Dia do vencimento"><input type="number" name="dueDay" min={1} max={28} required defaultValue={s.dueDay} className="input w-32" /></Field>
-                                  <InvoiceItems initial={invoiceItems(s)} services={services} />
+                                  <InvoiceItems initial={invoiceItems(s)} services={services} extraSuggestions={operations.map((o) => opDescription(o.name))} />
                                   <Field label="Observações"><textarea name="notes" rows={2} defaultValue={s.notes} className="input" /></Field>
                                   <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="applyOpen" defaultChecked className="h-4 w-4" /> Aplicar também às faturas em aberto que ainda não venceram</label>
                                 </ActionForm>
@@ -196,7 +199,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                         {inv.bankChargeId && <span className="block text-xs text-ink-400">boleto emitido</span>}
                       </td>
                       <td className="td">
-                        <InvoiceActions inv={inv} today={today} accounts={accounts} services={services} hasBank={hasBank} />
+                        <InvoiceActions inv={inv} today={today} accounts={accounts} operations={operations} services={services} hasBank={hasBank} />
                       </td>
                     </tr>
                   );

@@ -153,6 +153,15 @@ export async function syncInvoice(_: ActionResult, fd: FormData): Promise<Action
   }
 }
 
+
+/** Operacao e caixa vindos do formulario (so os da propria empresa). */
+async function opAndAccount(tenantId: string, fd: FormData) {
+  const out: { operationId?: string | null; accountId?: string | null } = {};
+  if (fd.has('operationId')) { const id = str(fd, 'operationId'); out.operationId = id && (await db.operation.findFirst({ where: { id, tenantId } })) ? id : null; }
+  if (fd.has('accountId')) { const id = str(fd, 'accountId'); out.accountId = id && (await db.bankAccount.findFirst({ where: { id, tenantId } })) ? id : null; }
+  return out;
+}
+
 /** Edita uma fatura em aberto sem boleto: itens, vencimento e observacoes. */
 export async function updateInvoice(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireAdmin();
@@ -163,7 +172,7 @@ export async function updateInvoice(_: ActionResult, fd: FormData): Promise<Acti
   if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe o vencimento.' };
   const items = readItems(fd);
   if (typeof items === 'string') return { error: items };
-  await db.invoice.update({ where: { id: inv.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDate, notes: str(fd, 'notes') ?? '' } });
+  await db.invoice.update({ where: { id: inv.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDate, notes: str(fd, 'notes') ?? '', ...(await opAndAccount(user.tenantId, fd)) } });
   await afterPlatformInvoiceChange(inv.clientId);
   revalidatePath('/', 'layout');
   return { ok: true };
@@ -183,7 +192,8 @@ export async function updateCharge(_: ActionResult, fd: FormData): Promise<Actio
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) return { error: 'O dia de vencimento deve ficar entre 1 e 28.' };
   const notes = str(fd, 'notes') ?? '';
   await rememberServices(user.tenantId, items);
-  const updated = await db.subscription.update({ where: { id: sub.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDay, notes } });
+  const oa = await opAndAccount(user.tenantId, fd);
+  const updated = await db.subscription.update({ where: { id: sub.id }, data: { items: JSON.stringify(items), amountCents: itemsTotal(items), dueDay, notes, ...oa } });
   let changed = 0;
   if (fd.get('applyOpen') === 'on') {
     const open = await db.invoice.findMany({ where: { subscriptionId: sub.id, status: 'aberta', bankChargeId: null, dueDate: { gte: localDate() } } });
@@ -191,7 +201,7 @@ export async function updateCharge(_: ActionResult, fd: FormData): Promise<Actio
       const ym = inv.competence!;
       const tag = sub.mode === 'periodo' ? ` — parcela ${inv.installment}/${sub.months} (${competenceLabel(ym)})` : ` — ${competenceLabel(ym)}`;
       const its = items.map((it) => ({ ...it, description: it.description + tag }));
-      await db.invoice.update({ where: { id: inv.id }, data: { items: JSON.stringify(its), amountCents: itemsTotal(its), dueDate: dueFor(ym, dueDay), notes } });
+      await db.invoice.update({ where: { id: inv.id }, data: { items: JSON.stringify(its), amountCents: itemsTotal(its), dueDate: dueFor(ym, dueDay), notes, ...oa } });
       changed++;
     }
   }

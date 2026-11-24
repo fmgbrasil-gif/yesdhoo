@@ -67,11 +67,13 @@ export async function chargeFromForm(user: SessionUser, fd: FormData): Promise<C
   const mode = String(fd.get('mode'));
   const opId = str(fd, 'operationId');
   const operationId = opId && (await db.operation.findFirst({ where: { id: opId, tenantId: user.tenantId } })) ? opId : null;
+  const accId = str(fd, 'accountId');
+  const accountId = accId && (await db.bankAccount.findFirst({ where: { id: accId, tenantId: user.tenantId } })) ? accId : null;
   if (mode === 'avulsa') {
     const dueDate = str(fd, 'dueDate');
     if (!dueDate || !DATE.test(dueDate)) return { error: 'Informe a data de vencimento.' };
     await rememberServices(user.tenantId, items);
-    const inv = await createInvoice(user.tenantId, { clientId: client.id, items, dueDate, notes, operationId });
+    const inv = await createInvoice(user.tenantId, { clientId: client.id, items, dueDate, notes, operationId, accountId });
     return { message: 'Fatura criada.', invoiceId: inv.id, subscriptionId: null, clientId: client.id };
   }
   if (mode !== 'periodo' && mode !== 'recorrente') return { error: 'Escolha o tipo de cobrança.' };
@@ -82,7 +84,7 @@ export async function chargeFromForm(user: SessionUser, fd: FormData): Promise<C
   const months = Number(str(fd, 'months'));
   if (mode === 'periodo' && (!Number.isInteger(months) || months < 2 || months > 60)) return { error: 'O período deve ter entre 2 e 60 meses.' };
   await rememberServices(user.tenantId, items);
-  const sub = await createSubscription(user.tenantId, { clientId: client.id, mode, items, dueDay, startMonth, months: mode === 'periodo' ? months : undefined, notes, operationId });
+  const sub = await createSubscription(user.tenantId, { clientId: client.id, mode, items, dueDay, startMonth, months: mode === 'periodo' ? months : undefined, notes, operationId, accountId });
   const first = await db.invoice.findFirst({ where: { subscriptionId: sub.id }, orderBy: { dueDate: 'asc' } });
   return {
     message: mode === 'periodo' ? `${months} faturas geradas.` : 'Cobrança recorrente criada. As faturas serão geradas todo mês automaticamente.',

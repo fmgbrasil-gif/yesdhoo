@@ -4,15 +4,15 @@ import type { Subscription } from '@prisma/client';
 import { fmtMoney } from '@/lib/money';
 import { SUB_MODE } from '@/lib/billing';
 import { ActionForm, Field, Modal } from './ui';
-import { ChargeFields } from './ChargeForm';
+import { ChargeFields, type AccountOpt, type OpOpt } from './ChargeForm';
 import type { ServiceOpt } from './InvoiceItems';
 import { generateContract, saveCharge } from '@/app/(painel)/financeiro/actions';
 
 type Opt = { id: string; name: string; kind: string };
 
 /** Botoes do topo do Financeiro (tambem em Contas a receber). */
-export function FinanceButtons({ clients, subs: activeSubs, services, operations, today }: {
-  clients: Opt[]; subs: (Subscription & { client: { name: string } })[]; services: ServiceOpt[]; operations: { id: string; name: string }[]; today: string;
+export function FinanceButtons({ clients, subs: activeSubs, services, operations, accounts, today }: {
+  clients: Opt[]; subs: (Subscription & { client: { name: string } })[]; services: ServiceOpt[]; operations: OpOpt[]; accounts: AccountOpt[]; today: string;
 }) {
   return (
     <>
@@ -46,7 +46,7 @@ export function FinanceButtons({ clients, subs: activeSubs, services, operations
       <Modal trigger={<><Zap size={16} /> Cobrança simples</>} triggerClass="btn-ghost" title="Cobrança simples" wide>
         <ActionForm action={saveCharge} submit="Criar cobrança">
           <p className="text-sm text-ink-500">Para clientes que já têm contrato: cria só a cobrança (avulsa, por período ou recorrente), sem contrato e sem passar pelas etapas.</p>
-          <ChargeFields clients={clients} today={today} services={services} operations={operations} />
+          <ChargeFields clients={clients} today={today} services={services} operations={operations} accounts={accounts} />
         </ActionForm>
       </Modal>
       <Link href="/financeiro/nova" className="btn-primary"><Plus size={16} /> Nova cobrança</Link>
