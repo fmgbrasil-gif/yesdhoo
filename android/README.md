@@ -36,16 +36,14 @@ Requisitos: JDK 17+ e Android SDK (plataforma 34). Com `ANDROID_HOME` definido:
 ./gradlew assembleDebug
 ```
 
-O APK sai em `app/build/outputs/apk/debug/`. O arquivo em `dist/` é uma compilação **de teste**, assinada com chave
-de depuração. Para distribuir de verdade, crie a sua chave e compile a versão `release` — as atualizações só
-instalam por cima se forem assinadas sempre com a mesma chave:
+O APK de teste sai em `app/build/outputs/apk/debug/`. A versão distribuída (`dist/` e `public/download/`) é a
+`release`, assinada com a **chave definitiva da Yes** (alias `yesdooh`, RSA 4096, válida até 11/04/2054,
+SHA-256 `D9:3A:B3:E5:F3:22:EA:BF:0A:9C:ED:89:FD:67:79:FE:C8:38:6E:50:41:F8:DB:07:43:07:CA:B3:E5:1D:65:9C`).
 
-```bash
-keytool -genkeypair -v -keystore yesdooh.jks -alias yesdooh -keyalg RSA -keysize 2048 -validity 10000
-```
-
-Informe a chave em `~/.gradle/gradle.properties` (`YESDOOH_STORE_FILE`, `YESDOOH_STORE_PASSWORD`,
-`YESDOOH_KEY_ALIAS`, `YESDOOH_KEY_PASSWORD`) e rode:
+O arquivo da chave e a senha ficam guardados, criptografados, no painel: **Plataforma → Chave do app Android**
+(só o super admin vê; botão “Baixar arquivo da chave” e “Mostrar senha”). Para compilar, baixe o arquivo, informe-o
+em `~/.gradle/gradle.properties` (`YESDOOH_STORE_FILE`, `YESDOOH_STORE_PASSWORD`, `YESDOOH_KEY_ALIAS=yesdooh`,
+`YESDOOH_KEY_PASSWORD` — a mesma senha) e rode:
 
 ```bash
 ./gradlew assembleRelease

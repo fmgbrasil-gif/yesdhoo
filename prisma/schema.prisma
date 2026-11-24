@@ -547,3 +547,19 @@ model SavedOption {
   createdAt DateTime @default(now())
   @@unique([tenantId, kind, value])
 }
+
+// Chave de assinatura do app Android (e outras chaves da plataforma). Arquivo e senha criptografados
+// com SIGNING_KEY_SECRET (configuracao do servidor). So o administrador da plataforma ve.
+model SigningKey {
+  id           String   @id @default(uuid())
+  name         String   @unique // ex.: android
+  alias        String
+  fileName     String
+  keystoreEnc  String   // arquivo da chave (base64) criptografado
+  passwordEnc  String   // senha criptografada (mesma para o arquivo e a chave)
+  sha256       String   // impressao digital do certificado (conferir assinatura dos APKs)
+  validUntil   String?
+  notes        String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

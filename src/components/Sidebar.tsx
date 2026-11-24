@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone,
+  BarChart3, Monitor, Film, Layers, Sparkles, Rss, Megaphone, Wrench, Users, FileBarChart, UserCog, Bell, Moon, Sun, LogOut, Menu, X, Star, Camera, PanelLeftClose, Wallet, Building2, Crown, PanelLeftOpen, Network, Receipt, Landmark, HandCoins, Smartphone, KeyRound,
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Avatar } from './basic';
@@ -42,6 +42,7 @@ const NAV = [
   { href: '/empresa', label: 'Minha empresa', icon: Building2, admin: true },
   { group: 'Plataforma', superAdmin: true },
   { href: '/plataforma', label: 'Empresas clientes', icon: Crown, superAdmin: true },
+  { href: '/plataforma/chave', label: 'Chave do app Android', icon: KeyRound, superAdmin: true },
 ] as const;
 
 export function Sidebar({ user, company, favorites, notifications, logout, markRead }: Props) {
