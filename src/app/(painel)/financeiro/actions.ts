@@ -217,9 +217,12 @@ export async function refreshContract(_: ActionResult, fd: FormData): Promise<Ac
   if (!c || !c.operation) return { error: 'Este contrato não é de uma operação; não dá para refazer pelo modelo.' };
   if (c.signStatus === 'assinado') return { error: 'Contrato já assinado pelo cliente: o texto não pode mais ser alterado.' };
   const sub = c.subscription;
-  const inv = sub ? null : await db.invoice.findFirst({ where: { clientId: c.clientId, tenantId: user.tenantId, status: { not: 'cancelada' } }, orderBy: { createdAt: 'desc' } });
-  if (!sub && !inv) return { error: 'Não encontrei a cobrança deste contrato.' };
-  const charge = sub
+  const cortesia = !sub && c.client.kind === 'cortesia';
+  const inv = sub || cortesia ? null : await db.invoice.findFirst({ where: { clientId: c.clientId, tenantId: user.tenantId, status: { not: 'cancelada' } }, orderBy: { createdAt: 'desc' } });
+  if (!sub && !inv && !cortesia) return { error: 'Não encontrei a cobrança deste contrato.' };
+  const charge = cortesia
+    ? { mode: 'cortesia', amountCents: 0 }
+    : sub
     ? { mode: sub.mode, amountCents: sub.amountCents, dueDay: sub.dueDay, startMonth: sub.startMonth, months: sub.months }
     : { mode: 'avulsa', amountCents: inv!.amountCents, dueDate: inv!.dueDate };
   const body = basicContract(user.tenant, c.client, charge, c.operation, c.createdAt.toISOString().slice(0, 10));

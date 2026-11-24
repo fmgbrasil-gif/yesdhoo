@@ -70,12 +70,15 @@ export async function wizardContract(fd: FormData): Promise<Fail | { ok: true; c
   const sub = subId ? await db.subscription.findFirst({ where: { id: subId, tenantId: user.tenantId, clientId: client.id } }) : null;
   const invId = str(fd, 'invoiceId');
   const inv = !sub && invId ? await db.invoice.findFirst({ where: { id: invId, tenantId: user.tenantId, clientId: client.id } }) : null;
-  if (!sub && !inv) return { ok: false, error: 'Cobrança não encontrada.' };
-  const charge = sub
+  const cortesia = !sub && !inv && client.kind === 'cortesia';
+  if (!sub && !inv && !cortesia) return { ok: false, error: 'Cobrança não encontrada.' };
+  const charge = cortesia
+    ? { mode: 'cortesia', amountCents: 0 }
+    : sub
     ? { mode: sub.mode, amountCents: sub.amountCents, dueDay: sub.dueDay, startMonth: sub.startMonth, months: sub.months }
     : { mode: 'avulsa', amountCents: inv!.amountCents, dueDate: inv!.dueDate };
   const body = basicContract(user.tenant, client, charge, op, localDate());
-  const title = `Contrato — ${client.tradeName || client.name} — ${op.name}`;
+  const title = `Contrato${cortesia ? ' de cortesia' : ''} — ${client.tradeName || client.name} — ${op.name}`;
   const contract = await db.contract.create({ data: { tenantId: user.tenantId, clientId: client.id, subscriptionId: sub?.id ?? null, operationId: op.id, title, body, publicToken: randomToken(18) } });
   if (sub) {
     await db.subscription.update({ where: { id: sub.id }, data: { operationId: op.id } });

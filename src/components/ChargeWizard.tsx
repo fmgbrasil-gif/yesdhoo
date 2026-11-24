@@ -159,9 +159,9 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   const makeContract = () => run(async () => {
     if (!opId) { setError('Escolha a operação do contrato.'); return; }
     const fd = new FormData();
-    fd.set('clientId', charge!.clientId); fd.set('operationId', opId);
-    if (charge!.subscriptionId) fd.set('subscriptionId', charge!.subscriptionId);
-    if (charge!.invoiceId) fd.set('invoiceId', charge!.invoiceId);
+    fd.set('clientId', charge?.clientId ?? client!.id); fd.set('operationId', opId);
+    if (charge?.subscriptionId) fd.set('subscriptionId', charge.subscriptionId);
+    if (charge?.invoiceId) fd.set('invoiceId', charge.invoiceId);
     const r = await wizardContract(fd);
     if (!r.ok) { setError(r.error); return; }
     setContract(r);
@@ -284,7 +284,29 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
       {step === 1 && client && !charge && client.kind === 'cortesia' && (
         <div className="space-y-4">
           <h2 className="flex items-center gap-2 text-lg font-bold"><Receipt size={18} /> Cortesia</h2>
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"><b>{client.name}</b> está cadastrado como <b>cortesia (sem custo mensal)</b>. Não é gerada cobrança, fatura nem Pix. Agora é só cadastrar a mídia e escolher as telas onde ela vai passar.</p>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"><b>{client.name}</b> está cadastrado como <b>cortesia (sem custo mensal)</b>. Não é gerada cobrança, fatura nem Pix. O contrato sai no mesmo padrão, <b>sem valor</b>, dizendo que a veiculação é uma cortesia.</p>
+          <h3 className="flex items-center gap-2 font-bold"><FileSignature size={16} /> Contrato de cortesia</h3>
+          {contract ? (
+            <div className="space-y-3">
+              <p className="text-sm">Contrato <b>{contract.title}</b> gerado.</p>
+              <div className="flex flex-wrap gap-2">
+                <a href={contract.publicUrl} target="_blank" rel="noreferrer" className="btn-ghost"><ExternalLink size={15} /> Ver contrato</a>
+                <a href={`/contratos/${contract.contractId}`} target="_blank" rel="noreferrer" className="btn-ghost">Editar texto</a>
+                <button type="button" className="btn-ghost" onClick={() => download('contrato')}>{saved.contrato ? <Check size={15} className="text-emerald-600" /> : <Download size={15} />} Baixar PDF</button>
+                <a href={`https://wa.me/?text=${encodeURIComponent(`*CONTRATO DE CORTESIA*\n\nOlá, ${client.name}. Segue o contrato de veiculação em cortesia (sem custo) para leitura e assinatura eletrônica:\n${typeof window === 'undefined' ? '' : window.location.origin}${contract.publicUrl}`)}`} target="_blank" rel="noreferrer" className="btn bg-emerald-600 text-white hover:bg-emerald-500"><MessageCircle size={15} /> Enviar pelo WhatsApp</a>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <Field label="Para qual operação é este contrato?" hint="Os pontos da operação entram no contrato">
+                <select value={opId} onChange={(e) => setOpId(e.target.value)} aria-label="Operação" className="input max-w-md">
+                  <option value="">{ops.length ? 'Selecione a operação...' : 'Nenhuma operação cadastrada'}</option>
+                  {ops.map((o) => <option key={o.id} value={o.id}>{o.name} ({o.screenIds.length} ponto{o.screenIds.length === 1 ? '' : 's'})</option>)}
+                </select>
+              </Field>
+              <button type="button" className="btn-primary" onClick={makeContract} disabled={busy || !opId}>{busy ? <Loader2 size={15} className="animate-spin" /> : <FileSignature size={15} />} Gerar contrato sem valor</button>
+            </div>
+          )}
           <div className="flex flex-wrap justify-between gap-2">
             {back(0)}
             <span className="flex flex-wrap gap-2">
