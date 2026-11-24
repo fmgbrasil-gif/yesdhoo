@@ -9,6 +9,7 @@ import type { Playable } from '@/lib/playables';
 import { fmtDuration } from '@/lib/util';
 import { MEDIA_TYPES } from '@/lib/constants';
 import type { ActionResult } from './ui';
+import { ContentPreview } from './ContentPreview';
 
 const SECTIONS = [
   { key: 'midias', label: 'Minhas mídias', icon: Film },
@@ -33,8 +34,8 @@ function Thumb({ p }: { p: Playable }) {
   );
 }
 
-export function PlaylistEditor({ screenId, playables, initial, others, save }: {
-  screenId: string; playables: Playable[]; initial: string[]; others: { id: string; name: string; keys: string[] }[];
+export function PlaylistEditor({ screenId, playables, initial, others, save, vertical = false }: {
+  screenId: string; playables: Playable[]; vertical?: boolean; initial: string[]; others: { id: string; name: string; keys: string[] }[];
   save: (prev: ActionResult, fd: FormData) => Promise<ActionResult>;
 }) {
   const byKey = useMemo(() => Object.fromEntries(playables.map((p) => [p.key, p])), [playables]);
@@ -94,12 +95,15 @@ export function PlaylistEditor({ screenId, playables, initial, others, save }: {
           <div className="grid max-h-[62vh] gap-2 overflow-y-auto p-4 sm:grid-cols-2">
             {list.length === 0 && <p className="col-span-full py-8 text-center text-sm text-ink-400">Nenhum conteúdo encontrado...</p>}
             {list.map((p) => (
-              <button key={p.key} disabled={!p.compatible} onClick={() => change([...items, row(p.key)])} title={p.compatible ? 'Adicionar à playlist' : (p.reason ?? 'Não há arquivo para a orientação desta tela')}
-                className="group flex items-center gap-3 rounded-lg border border-ink-100 p-2 text-left hover:border-brand-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-ink-700">
-                <Thumb p={p} />
-                <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{p.name}</span><span className="block truncate text-xs text-ink-400">{p.compatible ? p.sub : `Incompatível: ${p.reason ?? 'sem arquivo para esta tela'}`}</span></span>
-                <Plus size={18} className="text-ink-300 group-hover:text-brand-600" />
-              </button>
+              <div key={p.key} className={`group flex items-center gap-1 rounded-lg border border-ink-100 p-2 hover:border-brand-400 dark:border-ink-700 ${p.compatible ? '' : 'opacity-60'}`}>
+                <button disabled={!p.compatible} onClick={() => change([...items, row(p.key)])} title={p.compatible ? 'Adicionar à playlist' : (p.reason ?? 'Não há arquivo para a orientação desta tela')}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed">
+                  <Thumb p={p} />
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{p.name}</span><span className="block truncate text-xs text-ink-400">{p.compatible ? p.sub : `Incompatível: ${p.reason ?? 'sem arquivo para esta tela'}`}</span></span>
+                </button>
+                {p.preview && <ContentPreview iconOnly startVertical={vertical} h={p.preview.h} v={p.preview.v} />}
+                <button disabled={!p.compatible} onClick={() => change([...items, row(p.key)])} aria-label={`Adicionar ${p.name}`} title="Adicionar à playlist" className="p-1.5 text-ink-300 hover:text-brand-600 disabled:cursor-not-allowed"><Plus size={18} /></button>
+              </div>
             ))}
           </div>
         )}
@@ -139,6 +143,7 @@ export function PlaylistEditor({ screenId, playables, initial, others, save }: {
                     {p.period ? <><CalendarClock size={12} className={expired(p) ? 'text-red-500' : ''} /> {p.period}</> : p.compatible ? p.sub : <span title={p.reason ?? ''}>Incompatível: {p.reason ?? 'sem arquivo para esta tela'}</span>}
                   </span>
                 </span>
+                {p.preview && <ContentPreview iconOnly startVertical={vertical} h={p.preview.h} v={p.preview.v} />}
                 <span className="flex flex-col">
                   <button className="text-ink-400 hover:text-ink-900 disabled:opacity-20 dark:hover:text-white" aria-label={`Subir ${p.name}`} disabled={i === 0} onClick={() => move(i, i - 1)}><ArrowUp size={14} /></button>
                   <button className="text-ink-400 hover:text-ink-900 disabled:opacity-20 dark:hover:text-white" aria-label={`Descer ${p.name}`} disabled={i === items.length - 1} onClick={() => move(i, i + 1)}><ArrowDown size={14} /></button>

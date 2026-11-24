@@ -34,8 +34,8 @@ function Screen({ media, vertical, n, onEmpty }: { media: PlayerMedia; vertical:
 }
 
 /** Botao "Visualizar": abre a previa do conteudo como ele aparece na tela (horizontal ou vertical). */
-export function ContentPreview({ h, v, inline = false }: { h: PlayerMedia; v: PlayerMedia; inline?: boolean }) {
-  const [vertical, setVertical] = useState(false);
+export function ContentPreview({ h, v, inline = false, iconOnly = false, startVertical = false }: { h: PlayerMedia; v: PlayerMedia; inline?: boolean; iconOnly?: boolean; startVertical?: boolean }) {
+  const [vertical, setVertical] = useState(startVertical);
   const [n, setN] = useState(0);
   const [empty, setEmpty] = useState(false);
   const media = vertical ? v : h;
@@ -65,7 +65,7 @@ export function ContentPreview({ h, v, inline = false }: { h: PlayerMedia; v: Pl
   );
   if (inline) return body;
   return (
-    <Modal trigger={<><Eye size={15} /> Visualizar</>} triggerClass="btn-ghost shrink-0" titleAttr="Visualizar" title={`Prévia — ${h.name}`} wide>
+    <Modal trigger={iconOnly ? <Eye size={16} /> : <><Eye size={15} /> Visualizar</>} triggerClass={iconOnly ? 'p-1.5 rounded-md text-ink-400 hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-ink-700' : 'btn-ghost shrink-0'} titleAttr={`Visualizar ${h.name}`} title={`Prévia — ${h.name}`} wide>
       {body}
     </Modal>
   );

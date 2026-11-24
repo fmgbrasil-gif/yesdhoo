@@ -27,7 +27,7 @@ export default async function PlaylistPage({ params }: { params: Promise<{ id: s
     <>
       <PageHeader title={<>Playlist de <span className="text-brand-600">#{screen.name}</span></>} crumbs={[{ label: 'Minhas telas', href: '/telas' }, { label: screen.name, href: `/telas/${id}` }, { label: 'Playlist' }]} />
       <ScreenHeader screen={screen} categories={categories} clients={clients} />
-      <PlaylistEditor screenId={id} playables={playables} initial={screen.items.map(itemKey)} others={others.map((o) => ({ id: o.id, name: o.name, keys: o.items.map(itemKey) }))} save={savePlaylist} />
+      <PlaylistEditor vertical={screen.orientation === 'V'} screenId={id} playables={playables} initial={screen.items.map(itemKey)} others={others.map((o) => ({ id: o.id, name: o.name, keys: o.items.map(itemKey) }))} save={savePlaylist} />
     </>
   );
 }

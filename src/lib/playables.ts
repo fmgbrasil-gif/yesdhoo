@@ -18,6 +18,8 @@ export type Playable = {
   period: string | null;
   endIso?: string | null;
   count?: number;
+  /** dados para a previa (Visualizar) antes de escolher */
+  preview?: { h: PlayerMedia; v: PlayerMedia } | null;
 };
 
 type MediaWithClient = Media & { client?: { name: string; active?: boolean } | null };
@@ -58,6 +60,7 @@ export function mediaToPlayable(m: MediaWithClient, orientation: string): Playab
     duration: m.duration, thumb: mediaThumb(m), compatible: isCompatible(m, orientation) && m.client?.active !== false, reason: incompatibleReason(m, orientation),
     period: m.startDate || m.endDate ? `${m.startDate ? br(m.startDate) : '…'} a ${m.endDate ? br(m.endDate) : '…'}` : null,
     endIso: m.endDate,
+    preview: { h: mediaForPlayer(m, 'H'), v: mediaForPlayer(m, 'V') },
   };
 }
 
@@ -65,6 +68,7 @@ export function groupToPlayable(g: MediaGroup & { medias: { media: Media }[] }):
   return {
     key: `g:${g.id}`, id: g.id, isGroup: true, name: g.name, sub: `${g.medias.length} mídia(s) em rodízio`, type: 'grupo', section: 'grupos',
     duration: g.medias[0]?.media.duration ?? 0, thumb: fileUrl(g.image) ?? (g.medias[0] ? mediaThumb(g.medias[0].media) : null), compatible: true, period: null, count: g.medias.length,
+    preview: g.medias[0] ? { h: mediaForPlayer(g.medias[0].media, 'H'), v: mediaForPlayer(g.medias[0].media, 'V') } : null,
   };
 }
 
