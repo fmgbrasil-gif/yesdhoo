@@ -31,7 +31,8 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const tab = sp.aba === 'recorrencias' || sp.aba === 'contratos' ? sp.aba : 'faturas';
   const today = localDate();
   const { page, size, skip, take } = pageParams(sp);
-  const status = sp.situacao;
+  // padrao: Em aberto (tudo o que nao foi pago); "todas" mostra tudo menos o arquivo morto
+  const status = sp.situacao === 'todas' ? '' : sp.situacao || 'aberta';
   const accounts = await db.bankAccount.findMany({ where: { tenantId: tid, active: true }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }], select: { id: true, name: true } });
   const operations = await db.operation.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' }, select: { id: true, name: true } });
   // periodo de consulta: um mes (padrao: o atual), um intervalo personalizado ou todo o periodo
@@ -41,7 +42,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   const qs = (extra: Record<string, string | undefined>) => periodHref('/financeiro', per, extra);
   const where = {
     tenantId: tid,
-    ...(status === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : status === 'aberta' ? { status: 'aberta', dueDate: { gte: today } } : status === 'paga' || status === 'cancelada' ? { status } : { status: { not: 'cancelada' } }), // canceladas ficam no arquivo morto
+    ...(status === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : status === 'aberta' ? { status: 'aberta' } : status === 'paga' || status === 'cancelada' ? { status } : { status: { not: 'cancelada' } }), // canceladas ficam no arquivo morto
     ...(sp.cliente ? { client: { name: like(sp.cliente) } } : {}),
   };
   const periodWhere = (w: { dueDate?: { gte?: string; lt?: string } }) => {
@@ -49,10 +50,13 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
     const r = { gte: de, lte: ate, ...(w.dueDate?.gte && w.dueDate.gte > de ? { gte: w.dueDate.gte } : {}), ...(w.dueDate?.lt ? { lt: w.dueDate.lt } : {}) };
     return { ...w, dueDate: r };
   };
-  Object.assign(where, periodWhere(where as { dueDate?: { gte?: string; lt?: string } }));
+  if (status === 'aberta') {
+    // em aberto: o que vence no periodo e tambem as vencidas de antes (divida nao some ao trocar de mes)
+    if (de && ate) Object.assign(where, { dueDate: { lte: ate }, OR: [{ dueDate: { gte: de } }, { dueDate: { lt: today } }] });
+  } else Object.assign(where, periodWhere(where as { dueDate?: { gte?: string; lt?: string } }));
   const sum = (w: object) => db.invoice.aggregate({ where: { tenantId: tid, ...w }, _sum: { amountCents: true }, _count: true });
   const [rows, total, open, overdue, paidMonth, clients] = await Promise.all([
-    db.invoice.findMany({ where, skip, take, orderBy: [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } }, operation: { select: { name: true, accountId: true } }, subscription: { select: { status: true } } } }),
+    db.invoice.findMany({ where, skip, take, orderBy: status === 'aberta' || status === 'vencida' ? [{ dueDate: 'asc' }, { number: 'asc' }] : [{ dueDate: 'desc' }, { number: 'desc' }], include: { client: { select: { name: true, kind: true, document: true } }, operation: { select: { name: true, accountId: true } }, subscription: { select: { status: true } } } }),
     db.invoice.count({ where }),
     sum(periodWhere({ status: 'aberta', dueDate: { gte: today } } as never)),
     sum(periodWhere({ status: 'aberta', dueDate: { lt: today } } as never)),
@@ -72,7 +76,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   );
   const hasBank = !!bankOf(user.tenant);
   const noPix = !user.tenant.pixKey && !hasBank;
-  const filters = [['', 'Todas'], ['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['cancelada', 'Arquivo morto']];
+  const filters = [['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['todas', 'Todas'], ['cancelada', 'Arquivo morto']];
 
   return (
     <>
@@ -164,11 +168,11 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
       {tab === 'faturas' && <div className="card overflow-hidden">
         <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">
           {filters.map(([k, label]) => (
-            <Link key={k} href={qs({ situacao: k || undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${(status ?? '') === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
+            <Link key={k} href={qs({ situacao: k === 'aberta' ? undefined : k })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${(status || 'todas') === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{label}</Link>
           ))}
         </div>
         <form className="flex flex-wrap items-end gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
-          {status && <input type="hidden" name="situacao" value={status} />}
+          {status !== 'aberta' && <input type="hidden" name="situacao" value={status || 'todas'} />}
           {Object.entries(per.params).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           <input name="cliente" defaultValue={sp.cliente} placeholder="Cliente ou parceiro..." className="input w-56" aria-label="Cliente ou parceiro" />
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>

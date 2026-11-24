@@ -17,12 +17,12 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
   const user = await requireAdmin();
   const t = user.tenant;
   const per = resolvePeriod(sp, localDate());
-  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao ?? '', de: per.de, ate: per.ate, por: sp.por };
+  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao || 'aberta', de: per.de, ate: per.ate, por: sp.por };
   const { today, list, totals } = await openDebts(user.tenantId, f);
   const op = f.operacao ? await db.operation.findFirst({ where: { id: f.operacao, tenantId: user.tenantId }, select: { name: true } }) : null;
   const logo = fileUrl(t.logo);
   const filtros = [
-    (SITUACOES.find(([k]) => k === f.situacao)?.[1] ?? 'Todas').toLowerCase(),
+    (SITUACOES.find(([k]) => k === f.situacao)?.[1] ?? 'Em aberto').toLowerCase(),
     per.de && per.ate ? `${sp.por === 'ref' ? 'referência' : 'vencimento'} de ${fmtDate(per.de)} a ${fmtDate(per.ate)}` : 'todo o período',
     op && `operação ${op.name}`, f.cliente && `cliente contém "${f.cliente}"`,
   ].filter(Boolean).join(' · ');
@@ -86,7 +86,7 @@ export default async function RelatorioReceber({ searchParams }: { searchParams:
         ))}
 
         {list.length > 0 && (
-          <div className="mt-4 flex justify-end border-t-2 border-black pt-2 text-sm font-bold">{f.situacao === 'paga' ? 'TOTAL RECEBIDO' : f.situacao === 'cancelada' ? 'TOTAL CANCELADO' : f.situacao === '' ? 'TOTAL GERAL' : 'TOTAL EM ABERTO'}: {fmtMoney(totals.total)}</div>
+          <div className="mt-4 flex justify-end border-t-2 border-black pt-2 text-sm font-bold">{f.situacao === 'paga' ? 'TOTAL RECEBIDO' : f.situacao === 'cancelada' ? 'TOTAL CANCELADO' : f.situacao === 'todas' ? 'TOTAL GERAL' : 'TOTAL EM ABERTO'}: {fmtMoney(totals.total)}</div>
         )}
       </article>
     </main>

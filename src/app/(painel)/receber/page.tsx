@@ -22,7 +22,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
   const user = await requireAdmin();
   const per = resolvePeriod(sp, localDate());
   const por = sp.por === 'ref' ? 'ref' : undefined;
-  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao ?? '', de: per.de, ate: per.ate, por };
+  const f = { cliente: sp.cliente, operacao: sp.operacao, situacao: sp.situacao || 'aberta', de: per.de, ate: per.ate, por };
   const tid = user.tenantId;
   const [{ list, totals }, operations, accounts, services, clients, subs] = await Promise.all([
     openDebts(tid, f),
@@ -43,7 +43,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
     sum({ status: 'aberta', dueDate: { ...(inDue ?? {}), lt: today } }),
     sum({ status: 'paga', ...(por ? {} : per.paidAt ? { paidAt: per.paidAt } : {}) }),
   ]);
-  const keep = { situacao: f.situacao || undefined, operacao: f.operacao, cliente: f.cliente, por };
+  const keep = { situacao: f.situacao === 'aberta' ? undefined : f.situacao, operacao: f.operacao, cliente: f.cliente, por };
   const h = await headers();
   const origin = `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('x-forwarded-host') ?? h.get('host')}`;
   const company = user.tenant.tradeName || user.tenant.name;
@@ -98,14 +98,14 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
 
       <div className="card overflow-hidden">
         <div className="flex flex-wrap gap-1 border-b border-ink-100 p-3 dark:border-ink-700">
-          {SITUACOES.map(([k, l]) => <Link key={k} href={periodHref('/receber', per, { ...keep, situacao: k || undefined })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${f.situacao === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{l}</Link>)}
+          {SITUACOES.map(([k, l]) => <Link key={k} href={periodHref('/receber', per, { ...keep, situacao: k === 'aberta' ? undefined : k })} className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${f.situacao === k ? 'bg-ink-900 text-white dark:bg-brand-400 dark:text-on-brand' : 'text-ink-500 hover:bg-ink-100 dark:hover:bg-ink-700'}`}>{l}</Link>)}
         </div>
         <form className="flex flex-wrap items-end gap-2 border-b border-ink-100 p-3 dark:border-ink-700">
-          {Object.entries({ ...per.params, situacao: f.situacao || undefined, por }).filter(([, v]) => v).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+          {Object.entries({ ...per.params, situacao: f.situacao === 'aberta' ? undefined : f.situacao, por }).filter(([, v]) => v).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
           {operations.length > 0 && <select name="operacao" defaultValue={f.operacao ?? ''} aria-label="Operação" className="input w-56"><option value="">Todas as operações</option>{operations.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select>}
           <input name="cliente" defaultValue={f.cliente} placeholder="Cliente ou parceiro..." aria-label="Cliente" className="input w-56" />
           <button className="btn-ghost"><Search size={15} /> Filtrar</button>
-          {(f.cliente || f.operacao) && <Link href={periodHref('/receber', per, { situacao: f.situacao || undefined, por })} className="btn-ghost">Limpar</Link>}
+          {(f.cliente || f.operacao) && <Link href={periodHref('/receber', per, { situacao: f.situacao === 'aberta' ? undefined : f.situacao, por })} className="btn-ghost">Limpar</Link>}
         </form>
         {list.length === 0 ? <Empty title="Nenhum débito em aberto" text="Todos os clientes estão em dia com os filtros escolhidos." /> : (
           <ul className="space-y-4 p-3 sm:p-4">

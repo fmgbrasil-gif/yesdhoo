@@ -12,24 +12,26 @@ export function invoicePeriod(por: string | undefined, de: string | null | undef
   return { OR: [{ competence: { gte: de.slice(0, 7), lte: ate.slice(0, 7) } }, { competence: null, dueDate: { gte: de, lte: ate } }] };
 }
 
-export const SITUACOES: [string, string][] = [['', 'Todas'], ['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['cancelada', 'Arquivo morto']];
-export const REPORT_TITLE: Record<string, string> = { '': 'Relatório de contas a receber', aberta: 'Relatório de contas a vencer', vencida: 'Relatório de débitos vencidos', paga: 'Relatório de recebimentos', cancelada: 'Relatório de faturas canceladas' };
+export const SITUACOES: [string, string][] = [['aberta', 'Em aberto'], ['vencida', 'Vencidas'], ['paga', 'Pagas'], ['todas', 'Todas'], ['cancelada', 'Arquivo morto']];
+export const REPORT_TITLE: Record<string, string> = { '': 'Relatório de contas a receber', todas: 'Relatório de contas a receber', aberta: 'Relatório de débitos em aberto', vencida: 'Relatório de débitos vencidos', paga: 'Relatório de recebimentos', cancelada: 'Relatório de faturas canceladas' };
 
 const days = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400_000);
 
 /** Faturas agrupadas por cliente (vencido, a vencer, recebido, maior atraso), com as faturas de cada um. */
 export async function openDebts(tenantId: string, f: DebtFilters) {
   const today = localDate();
-  const sit = f.situacao ?? '';
-  const status = sit === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : sit === 'aberta' ? { status: 'aberta', dueDate: { gte: today } } : sit === 'paga' || sit === 'cancelada' ? { status: sit } : { status: { not: 'cancelada' } };
+  // padrao: em aberto (nao pago, inclusive vencidas de antes do periodo); "todas" = tudo menos o arquivo morto
+  const sit = f.situacao === 'todas' ? '' : f.situacao || 'aberta';
+  const status = sit === 'vencida' ? { status: 'aberta', dueDate: { lt: today } } : sit === 'aberta' ? { status: 'aberta' } : sit === 'paga' || sit === 'cancelada' ? { status: sit } : { status: { not: 'cancelada' } };
   const range = f.por !== 'ref' && f.de && f.ate ? { gte: f.de, lte: f.ate } : null;
   const refPeriod = f.por === 'ref' ? invoicePeriod('ref', f.de, f.ate) : {};
   const dueDate = { ...((status as { dueDate?: object }).dueDate ?? {}), ...(range ?? {}) };
   if (range && sit === 'vencida' && today <= range.lte) Object.assign(dueDate, { lte: range.lte, lt: today });
-  if (range && sit === 'aberta' && today > range.gte) Object.assign(dueDate, { gte: today });
+  const openPrev = sit === 'aberta' && range ? { OR: [{ dueDate: { gte: range.gte } }, { dueDate: { lt: today } }] } : {};
+  if (sit === 'aberta' && range) delete (dueDate as { gte?: string }).gte; // vencidas de antes do periodo continuam aparecendo
   const invoices = await db.invoice.findMany({
     where: {
-      tenantId, ...status, ...(Object.keys(dueDate).length ? { dueDate } : {}), ...refPeriod,
+      tenantId, ...status, ...(Object.keys(dueDate).length ? { dueDate } : {}), ...refPeriod, ...openPrev,
       ...(f.cliente ? { client: { name: like(f.cliente) } } : {}),
       ...(f.operacao ? { operationId: f.operacao } : {}),
     },

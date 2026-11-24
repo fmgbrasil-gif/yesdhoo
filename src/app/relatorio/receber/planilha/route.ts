@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   if (!user || user.role !== 'admin') return new Response('Faça login como administrador.', { status: 401 });
   const q = new URL(req.url).searchParams;
   const per = resolvePeriod(Object.fromEntries(q), localDate());
-  const { list } = await openDebts(user.tenantId, { cliente: q.get('cliente') ?? undefined, operacao: q.get('operacao') ?? undefined, situacao: q.get('situacao') ?? '', de: per.de, ate: per.ate, por: q.get('por') ?? undefined });
+  const { list } = await openDebts(user.tenantId, { cliente: q.get('cliente') ?? undefined, operacao: q.get('operacao') ?? undefined, situacao: q.get('situacao') || 'aberta', de: per.de, ate: per.ate, por: q.get('por') ?? undefined });
   const rows = [['Cliente', 'CPF/CNPJ', 'Telefone', 'Fatura', 'Referência', 'Operação', 'Vencimento', 'Situação', 'Dias de atraso', 'Valor (R$)']];
   for (const g of list) for (const i of g.items) rows.push([g.client.name, fmtDoc(g.client.document), g.client.phone1 ?? '', String(i.number).padStart(6, '0'), i.ref, i.operation ?? '', fmtDate(i.dueDate), i.state === 'vencida' ? 'Vencida' : i.state === 'aberta' ? 'Em aberto' : i.state === 'paga' ? 'Paga' : 'Cancelada', String(i.late), brl(i.amountCents)]);
   const csv = '﻿' + rows.map((r) => r.map(cell).join(';')).join('\r\n');
