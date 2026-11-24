@@ -10,8 +10,8 @@ android {
         applicationId 'br.com.yesdooh.player'
         minSdk 21          // Android 5.0 em diante (cobre praticamente todo TV box)
         targetSdk 34
-        versionCode 5
-        versionName '1.4'
+        versionCode 6
+        versionName '1.5'
     }
 
     // Para publicar atualizacoes, assine sempre com a MESMA chave. Informe-a em ~/.gradle/gradle.properties:

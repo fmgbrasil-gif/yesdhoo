@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
         buildSplash();
 
         if (prefs.getString(KEY_URL, "").isEmpty()) showSetup(); else { loadPlayer(); checkAutostart(false); }
+        if (System.currentTimeMillis() - prefs.getLong("updateChecked", 0) > 20 * 3600_000L) handler.postDelayed(() -> checkUpdate(false), 60_000);
     }
 
     /** No Android 10+ o app so abre sozinho ao ligar se for a tela inicial ou puder "sobrepor a outros apps". */
@@ -288,22 +289,174 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+
+    // ---------- atualizacao do app pelo menu ----------
+
+    private int versionCode() {
+        try {
+            android.content.pm.PackageInfo i = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return Build.VERSION.SDK_INT >= 28 ? (int) i.getLongVersionCode() : i.versionCode;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** Servidor onde fica o arquivo de versao: o configurado (so o dominio) ou o padrao. */
+    private String updateBase() {
+        String url = prefs.getString(KEY_URL, DEFAULT_SERVER);
+        try {
+            Uri u = Uri.parse(url.matches("(?i)^https?://.*") ? url : "https://" + url);
+            return u.getScheme() + "://" + u.getAuthority();
+        } catch (Exception e) {
+            return DEFAULT_SERVER;
+        }
+    }
+
+    private static String httpGet(String url) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setConnectTimeout(15000);
+        c.setReadTimeout(15000);
+        c.setUseCaches(false);
+        try (java.io.InputStream in = c.getInputStream(); java.util.Scanner sc = new java.util.Scanner(in, "UTF-8").useDelimiter("\\A")) {
+            return sc.hasNext() ? sc.next() : "";
+        } finally {
+            c.disconnect();
+        }
+    }
+
+    /** Consulta /download/version.json; manual = pelo menu (sempre responde), automatico = so avisa se houver versao nova. */
+    private void checkUpdate(boolean manual) {
+        prefs.edit().putLong("updateChecked", System.currentTimeMillis()).apply();
+        if (manual) toast("Procurando atualização...");
+        new Thread(() -> {
+            String base = updateBase();
+            try {
+                org.json.JSONObject j;
+                try {
+                    j = new org.json.JSONObject(httpGet(base + "/download/version.json"));
+                } catch (Exception first) {
+                    base = DEFAULT_SERVER;
+                    j = new org.json.JSONObject(httpGet(base + "/download/version.json"));
+                }
+                int code = j.getInt("versionCode");
+                String name = j.optString("versionName", "?");
+                String apk = j.optString("url", "/download/YesDoohPlayer.apk");
+                String full = apk.startsWith("http") ? apk : base + apk;
+                String notes = j.optString("notes", "");
+                runOnUiThread(() -> {
+                    if (code <= versionCode()) {
+                        if (manual) new AlertDialog.Builder(this).setTitle("Atualizar versão").setMessage("Você já está na versão mais nova (" + appVersion() + ").").setPositiveButton("OK", null).show();
+                        return;
+                    }
+                    new AlertDialog.Builder(this)
+                            .setTitle("Nova versão disponível: " + name)
+                            .setMessage("Versão instalada: " + appVersion() + "\nVersão nova: " + name + (notes.isEmpty() ? "" : "\n\n" + notes) + "\n\nBaixar e instalar agora? O pareamento e a programação são mantidos.")
+                            .setPositiveButton("Atualizar", (d, w) -> downloadUpdate(full, name))
+                            .setNegativeButton("Depois", null)
+                            .show();
+                });
+            } catch (Exception e) {
+                if (manual) runOnUiThread(() -> new AlertDialog.Builder(this).setTitle("Atualizar versão").setMessage("Não foi possível verificar a atualização agora. Confira a internet e tente de novo.").setPositiveButton("OK", null).show());
+            }
+        }).start();
+    }
+
+    private void toast(String msg) {
+        android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    /** Baixa o APK novo mostrando o progresso na tela de abertura e abre o instalador do Android. */
+    private void downloadUpdate(String url, String name) {
+        status.setText("Baixando a versão " + name + "...");
+        splash.setVisibility(View.VISIBLE);
+        new Thread(() -> {
+            java.io.File out = new java.io.File(getCacheDir(), ApkProvider.FILE);
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(30000);
+                int total = c.getContentLength();
+                try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream fo = new java.io.FileOutputStream(out)) {
+                    byte[] buf = new byte[64 * 1024];
+                    long got = 0; int n, last = -1;
+                    while ((n = in.read(buf)) > 0) {
+                        fo.write(buf, 0, n);
+                        got += n;
+                        if (total > 0) {
+                            int pct = (int) (got * 100 / total);
+                            if (pct != last) { last = pct; runOnUiThread(() -> status.setText("Baixando a versão " + name + "... " + pct + "%")); }
+                        }
+                    }
+                } finally {
+                    c.disconnect();
+                }
+                out.setReadable(true, false);
+                runOnUiThread(() -> installUpdate(out));
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    splash.setVisibility(View.GONE);
+                    new AlertDialog.Builder(this).setTitle("Atualizar versão").setMessage("O download falhou. Confira a internet e tente de novo pelo menu.").setPositiveButton("OK", null).show();
+                });
+            }
+        }).start();
+    }
+
+    private void installUpdate(java.io.File apk) {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            // o Android pede para liberar "instalar apps desconhecidos" para o proprio player uma unica vez
+            splash.setVisibility(View.GONE);
+            new AlertDialog.Builder(this)
+                    .setTitle("Liberar a instalação")
+                    .setMessage("Na próxima tela, ative \"Permitir desta fonte\" para o Yes DOOH Player. Depois volte e escolha Atualizar de novo no menu.")
+                    .setPositiveButton("Abrir", (d, w) -> open(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))))
+                    .show();
+            return;
+        }
+        status.setText("Abrindo o instalador...");
+        Intent i = new Intent(Intent.ACTION_VIEW);
+        if (Build.VERSION.SDK_INT >= 24) {
+            i.setDataAndType(ApkProvider.uri(this), "application/vnd.android.package-archive");
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } else {
+            // Android antigo: o instalador le o arquivo direto (copiado para uma pasta publica do app)
+            java.io.File pub = new java.io.File(getExternalCacheDir() != null ? getExternalCacheDir() : getCacheDir(), ApkProvider.FILE);
+            try { copy(apk, pub); } catch (Exception ignored) { pub = apk; }
+            i.setDataAndType(Uri.fromFile(pub), "application/vnd.android.package-archive");
+        }
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(i);
+        } catch (Exception e) {
+            splash.setVisibility(View.GONE);
+            new AlertDialog.Builder(this).setMessage("Não foi possível abrir o instalador neste aparelho. Baixe pelo navegador em " + DEFAULT_SERVER + "/app").setPositiveButton("OK", null).show();
+        }
+    }
+
+    private static void copy(java.io.File from, java.io.File to) throws java.io.IOException {
+        try (java.io.FileInputStream in = new java.io.FileInputStream(from); java.io.FileOutputStream o = new java.io.FileOutputStream(to)) {
+            byte[] b = new byte[64 * 1024]; int n;
+            while ((n = in.read(b)) > 0) o.write(b, 0, n);
+        }
+        to.setReadable(true, false);
+    }
+
     private void showMenu() {
         String auto = autostartReady() ? "Abrir ao ligar o aparelho: LIBERADO ✓" : "Abrir ao ligar o aparelho: NÃO LIBERADO — configurar";
-        String[] items = {"Recarregar", "Configurar servidor e rotação", "Desparear e limpar dados", "Definir como tela inicial do aparelho", "Permitir sobrepor a outros apps", auto, "Sair do player"};
+        String[] items = {"Recarregar", "Atualizar versão do app (atual " + appVersion() + ")", "Configurar servidor e rotação", "Desparear e limpar dados", "Definir como tela inicial do aparelho", "Permitir sobrepor a outros apps", auto, "Sair do player"};
         new AlertDialog.Builder(this).setTitle("Yes DOOH Player " + appVersion()).setItems(items, (d, which) -> {
             switch (which) {
                 case 0: loadPlayer(); break;
-                case 1: showSetup(); break;
-                case 2:
+                case 1: checkUpdate(true); break;
+                case 2: showSetup(); break;
+                case 3:
                     WebStorage.getInstance().deleteAllData();
                     CookieManager.getInstance().removeAllCookies(null);
                     web.clearCache(true);
                     loadPlayer();
                     break;
-                case 3: setAsHome(); break;
-                case 4: allowOverlay(); break;
-                case 5: checkAutostart(true); break;
+                case 4: setAsHome(); break;
+                case 5: allowOverlay(); break;
+                case 6: checkAutostart(true); break;
                 default: finish();
             }
         }).show();

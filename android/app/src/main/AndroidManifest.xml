@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Permite abrir o player sozinho apos ligar o aparelho no Android 10+ -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- Atualizar o app pelo menu (baixa a versao nova do servidor e abre o instalador) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- TV box / Android TV: sem toque e com controle remoto -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -39,6 +41,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <provider
+            android:name=".ApkProvider"
+            android:authorities="${applicationId}.apk"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
         <receiver android:name=".BootReceiver" android:exported="true" android:enabled="true">
             <intent-filter>
