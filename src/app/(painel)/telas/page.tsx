@@ -44,7 +44,7 @@ export default async function TelasPage({ searchParams }: { searchParams: Promis
       <PageHeader title="Minhas telas" crumbs={[{ label: 'Minhas telas' }]}>
         <span className="text-sm text-ink-400">{nAll}/{user.tenant.planScreens} do plano</span>
         <a href="/app" target="_blank" rel="noreferrer" className="btn-ghost"><Smartphone size={16} /> Instalar app na TV</a>
-        <a href="/relatorio/pontos" target="_blank" rel="noreferrer" className="btn-ghost" title="Relatório promocional com os pontos ativos, fotos e nome das empresas"><Megaphone size={16} /> Relatório promocional</a>
+        <a href="/relatorio/pontos" target="_blank" rel="noreferrer" className="btn-ghost" title="Relatório promocional com os pontos ativos, fotos e nome das empresas"><Megaphone size={16} /> Folder promocional</a>
         <a href="/app#navegador" target="_blank" rel="noreferrer" className="btn-ghost" title="TV LG ou Samsung, sem Android: rodar pelo navegador"><Globe size={16} /> TV LG/Samsung (navegador)</a>
         <Modal trigger={<><Plus size={16} /> Nova tela</>} title="Nova tela">
           <ActionForm action={createScreen} submit="Criar tela"><ScreenFields categories={categories} clients={clients} /></ActionForm>

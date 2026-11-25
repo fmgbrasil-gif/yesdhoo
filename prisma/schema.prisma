@@ -21,6 +21,7 @@ model Tenant {
   stateRegistration String?                // inscricao estadual
   email          String?
   phone          String?
+  folder         String   @default("{}") // JSON do folder promocional (capa, textos, planos, logos, contato)
   road           String?
   number         String?
   complement     String?
