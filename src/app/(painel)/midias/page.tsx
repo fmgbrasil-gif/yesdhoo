@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Eye, Layers, Pencil, Plus, Power, Search, Trash2, MonitorUp, FileVideo } from 'lucide-react';
+import { Eye, Layers, Pencil, Plus, Search, Trash2, MonitorUp, FileVideo } from 'lucide-react';
 import { requireUser } from '@/lib/auth';
 import { db, like } from '@/lib/db';
 import { fmtDuration, timeAgo } from '@/lib/util';
@@ -7,11 +7,12 @@ import { mediaThumb } from '@/lib/playables';
 import { mediaFormData } from '@/lib/form-data';
 import { MEDIA_TYPES } from '@/lib/constants';
 import { Empty, PageHeader, Pagination, pageParams } from '@/components/basic';
-import { ActionButton, ActionForm, Confirm, Modal, Tabs } from '@/components/ui';
+import { ActionForm, Confirm, Modal, Tabs } from '@/components/ui';
 import { MediaFields, ScreensPicker } from '@/components/MediaForm';
-import { deleteMedia, saveMedia, toggleMedia, saveMediaScreens } from './actions';
+import { deleteMedia, saveMedia, saveMediaScreens } from './actions';
 import { kindLabel } from '@/lib/client-kind';
 import { OrientationIcons } from '@/components/OrientationIcons';
+import { MediaToggle } from '@/components/MediaToggle';
 
 const TYPES = ['arquivo', 'youtube', 'link'];
 
@@ -87,7 +88,7 @@ export default async function MidiasPage({ searchParams }: { searchParams: Promi
                       <td className="td text-ink-500">{timeAgo(m.updatedAt)}</td>
                       <td className="td">
                         <div className="flex justify-end gap-1.5">
-                          <ActionButton action={toggleMedia} fields={{ id: m.id }} title={m.active ? 'Desativar' : 'Ativar'}><Power size={15} className={m.active ? 'text-emerald-600' : ''} /></ActionButton>
+                          <MediaToggle small media={m} screens={new Set(m.items.map((i) => i.screenId)).size} />
                           <Modal trigger={<><MonitorUp size={15} /> Telas</>} triggerClass="btn-ghost !px-2.5 !py-1.5" titleAttr="Telas onde passa" title={`Em quais telas “${m.name}” vai passar?`}>
                             <ActionForm action={saveMediaScreens} submit="Salvar telas">
                               <input type="hidden" name="id" value={m.id} />

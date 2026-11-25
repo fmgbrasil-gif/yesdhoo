@@ -11,6 +11,7 @@ import { Bars, PageHeader } from '@/components/basic';
 import { ActionForm, Modal } from '@/components/ui';
 import { MediaFields, ScreensPicker } from '@/components/MediaForm';
 import { Notes } from '@/components/Notes';
+import { MediaToggle } from '@/components/MediaToggle';
 import { saveMedia, saveMediaNotes, saveMediaScreens } from '../actions';
 
 export default async function MidiaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -41,6 +42,7 @@ export default async function MidiaPage({ params }: { params: Promise<{ id: stri
     <>
       <PageHeader title={m.name} crumbs={[{ label: 'Minhas mídias', href: '/midias' }, { label: m.name }]}>
         <span className={`badge ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-ink-100 text-ink-500'}`}>{m.active ? 'Ativa' : 'Inativa'}</span>
+        <MediaToggle media={m} screens={screens.length} />
         <Modal trigger={<><Pencil size={15} /> Editar</>} triggerClass="btn-ghost" title={`Editar mídia (${MEDIA_TYPES[m.type]})`}>
           <ActionForm action={saveMedia}><MediaFields type={m.type} media={m} data={data} onScreens={screens.map((s) => s.id)} /></ActionForm>
         </Modal>

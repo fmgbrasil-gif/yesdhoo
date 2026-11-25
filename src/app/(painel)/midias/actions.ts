@@ -138,7 +138,7 @@ export async function toggleMedia(_: ActionResult, fd: FormData): Promise<Action
   await db.media.update({ where: { id: m.id }, data: { active: !m.active } });
   await bumpScreens(m.id);
   revalidatePath('/', 'layout');
-  return { ok: true };
+  return { ok: true, message: m.active ? 'Mídia desativada: ela sai de todas as telas em até 20 segundos.' : 'Mídia ativada: ela volta às telas em até 20 segundos.' };
 }
 
 export async function deleteMedia(_: ActionResult, fd: FormData): Promise<ActionResult> {
