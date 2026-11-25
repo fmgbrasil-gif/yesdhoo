@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser, screenScope, type SessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { bool, num, pairingCode, slugify, str } from '@/lib/util';
+import { bool, num, pairingCode, parseJson, slugify, str } from '@/lib/util';
 import { isUpload, removeFile, saveFile } from '@/lib/storage';
 import { COMMANDS } from '@/lib/constants';
 import type { ActionResult } from '@/components/ui';
@@ -31,8 +31,22 @@ function screenData(fd: FormData) {
     updateFrequency: num(fd, 'updateFrequency') ?? 10,
     audioEnabled: bool(fd, 'audioEnabled'),
     footerEnabled: bool(fd, 'footerEnabled'), footerText: str(fd, 'footerText') ?? '', footerBg: str(fd, 'footerBg') ?? '#000000',
+    companyName: str(fd, 'companyName'), promoText: str(fd, 'promoText') ?? '', promoInclude: fd.has('promoInclude') ? bool(fd, 'promoInclude') : true,
     footerColor: str(fd, 'footerColor') ?? '#FFFFFF', footerClock: bool(fd, 'footerClock'), footerWeather: bool(fd, 'footerWeather'),
   };
+}
+
+/** Fotos do ponto para o relatorio promocional: remove as marcadas e acrescenta as novas (maximo 4). */
+async function savePhotos(fd: FormData, current: string[]): Promise<{ keys: string[] } | { error: string }> {
+  const remove = new Set(fd.getAll('removePhoto').map(String));
+  const keep = current.filter((k) => !remove.has(k));
+  const files = fd.getAll('photos').filter(isUpload) as File[];
+  if (keep.length + files.length > 4) return { error: `Cada ponto aceita até 4 fotos (já tem ${keep.length}). Remova alguma antes de enviar novas.` };
+  if (files.some((f) => !f.type.startsWith('image/'))) return { error: 'As fotos do ponto precisam ser imagens (JPG ou PNG).' };
+  for (const k of current.filter((k) => remove.has(k))) await removeFile(k);
+  const added = [];
+  for (const f of files) added.push(await saveFile(f, 'pontos'));
+  return { keys: [...keep, ...added] };
 }
 
 async function uniqueCode() {
@@ -49,7 +63,9 @@ export async function createScreen(_: ActionResult, fd: FormData): Promise<Actio
   const count = await db.screen.count({ where: { tenantId: user.tenantId } });
   if (count >= user.tenant.planScreens) return { error: `Seu plano permite ${user.tenant.planScreens} telas. Amplie o plano para cadastrar mais.` };
   const image = isUpload(fd.get('image')) ? await saveFile(fd.get('image') as File, 'telas') : null;
-  const screen = await db.screen.create({ data: { ...data, image, tenantId: user.tenantId, pairingCode: await uniqueCode() } });
+  const photos = await savePhotos(fd, []);
+  if ('error' in photos) return photos;
+  const screen = await db.screen.create({ data: { ...data, image, photos: JSON.stringify(photos.keys), tenantId: user.tenantId, pairingCode: await uniqueCode() } });
   redirect(`/telas/${screen.id}`);
 }
 
@@ -60,7 +76,9 @@ export async function updateScreen(_: ActionResult, fd: FormData): Promise<Actio
   if (!data.name) return { error: 'Informe o nome da tela.' };
   let image = screen.image;
   if (isUpload(fd.get('image'))) { await removeFile(image); image = await saveFile(fd.get('image') as File, 'telas'); }
-  await db.screen.update({ where: { id: screen.id }, data: { ...data, image, playlistVersion: { increment: 1 } } });
+  const photos = await savePhotos(fd, parseJson<string[]>(screen.photos, []));
+  if ('error' in photos) return photos;
+  await db.screen.update({ where: { id: screen.id }, data: { ...data, image, photos: JSON.stringify(photos.keys), playlistVersion: { increment: 1 } } });
   revalidatePath('/telas', 'layout');
   return { ok: true };
 }

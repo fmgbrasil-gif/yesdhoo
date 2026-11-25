@@ -2,6 +2,9 @@ import type { Screen } from '@prisma/client';
 import { Field, Tabs, Toggle, WeekDaysPicker } from './ui';
 import MapView from './MapLazy';
 import { STATES, TIMEZONES, UPDATE_FREQUENCIES } from '@/lib/constants';
+import { fileUrl } from '@/lib/storage';
+import { parseJson } from '@/lib/util';
+import { PhotoInput } from './PhotoInput';
 
 type Opt = { id: string; name: string };
 
@@ -38,6 +41,27 @@ export function ScreenFields({ screen, categories, clients }: { screen?: Screen;
               <Field label="Telefone 1"><input name="phone1" defaultValue={s?.phone1 ?? ''} className="input" /></Field>
               <Field label="Telefone 2"><input name="phone2" defaultValue={s?.phone2 ?? ''} className="input" /></Field>
             </div>
+          </>
+        ) },
+        { label: 'Relatório promocional', content: (
+          <>
+            <p className="rounded-lg bg-brand-50 p-3 text-sm text-ink-700 dark:bg-ink-900 dark:text-ink-200">Estes dados aparecem no <b>Relatório promocional dos pontos</b> (Minhas telas → Relatório promocional), para enviar a anunciantes.</p>
+            <Toggle name="promoInclude" label="Incluir este ponto no relatório promocional" defaultChecked={s?.promoInclude ?? true} />
+            <Field label="Nome completo da empresa" hint="Como deve aparecer no relatório. Ex.: Academia Sky Fit Igarapava"><input name="companyName" defaultValue={s?.companyName ?? ''} className="input" placeholder={s?.name ?? ''} /></Field>
+            <Field label="Descrição do ponto" hint="Público, movimento, diferenciais. Ex.: Academia com 800 alunos ativos, tela na recepção."><textarea name="promoText" defaultValue={s?.promoText ?? ''} rows={3} className="input" /></Field>
+            <Field label="Fotos do ponto" hint="Até 4 fotos (fachada, ambiente, a tela instalada). JPG ou PNG.">
+              <PhotoInput name="photos" />
+            </Field>
+            {s && parseJson<string[]>(s.photos, []).length > 0 && (
+              <div className="grid grid-cols-4 gap-2">
+                {parseJson<string[]>(s.photos, []).map((k) => (
+                  <label key={k} className="space-y-1 text-xs">
+                    <img src={fileUrl(k) ?? ''} alt="" className="aspect-[4/3] w-full rounded-lg object-cover" />{/* eslint-disable-line @next/next/no-img-element */}
+                    <span className="flex items-center gap-1"><input type="checkbox" name="removePhoto" value={k} className="accent-red-600" /> Remover</span>
+                  </label>
+                ))}
+              </div>
+            )}
           </>
         ) },
         { label: 'Localização', content: (

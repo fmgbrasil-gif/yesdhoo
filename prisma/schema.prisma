@@ -308,6 +308,11 @@ model Screen {
   footerClock     Boolean   @default(true)
   footerWeather   Boolean   @default(false)
   favorite        Boolean   @default(false)
+  // relatorio promocional dos pontos
+  companyName     String?   // nome completo da empresa do ponto
+  promoText       String    @default("") // descricao do ponto para o relatorio
+  photos          String    @default("[]") // JSON: fotos do ponto (chaves de arquivo)
+  promoInclude    Boolean   @default(true) // aparece no relatorio promocional
   notes           String    @default("")
   // pareamento / dispositivo
   pairingCode     String    @unique
