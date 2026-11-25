@@ -3,6 +3,7 @@ import { Field, MultiPicker, Tabs, Toggle, WeekDaysPicker } from './ui';
 import { parseJson } from '@/lib/util';
 import { MediaUpload } from './MediaUpload';
 import { OriginPicker } from './OriginPicker';
+import { LIBRARY_SECTIONS } from '@/lib/constants';
 
 type Opt = { id: string; name: string };
 export type MediaFormData = { clients: (Opt & { kind: string })[]; categories: Opt[]; screens: { id: string; label: string; sub?: string }[]; operations: { label: string; ids: string[] }[]; remote: boolean };
@@ -21,7 +22,7 @@ function Colors({ fields, cfg }: { fields: [string, string, string][]; cfg: Reco
 }
 
 /** Formulario unico para todos os tipos de conteudo (abas Info e telas, Agendamento). */
-export function MediaFields({ type, media, data, onScreens = [] }: { type: string; media?: Media; data: MediaFormData; onScreens?: string[] }) {
+export function MediaFields({ type, media, data, onScreens = [], library }: { type: string; media?: Media; data: MediaFormData; onScreens?: string[]; library?: string }) {
   const m = media;
   const cfg = parseJson<Record<string, string>>(m?.config, {});
   const util = ['hora', 'dolar', 'clima'].includes(type);
@@ -33,7 +34,12 @@ export function MediaFields({ type, media, data, onScreens = [] }: { type: strin
   const info = (
     <>
       {!util && <Field label={type === 'rss' ? 'Título' : 'Nome'}><input name="name" required maxLength={75} defaultValue={m?.name} className="input" placeholder={type === 'aviso' ? 'Ex.: Aviso de funcionamento' : type === 'rss' ? 'Ex.: Notícias de esporte' : 'Ex.: Campanha de Natal'} /></Field>}
-      {['arquivo', 'youtube', 'link'].includes(type) && (
+      {library !== undefined && (
+        <Field label="Seção dos Conteúdos dinâmicos"><input type="hidden" name="clientId" value="" />
+          <select name="library" defaultValue={m?.library ?? library ?? 'diversos'} className="input">{Object.entries(LIBRARY_SECTIONS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        </Field>
+      )}
+      {['arquivo', 'youtube', 'link'].includes(type) && library === undefined && (
         <div className="grid grid-cols-2 gap-3">
           <OriginPicker clients={data.clients} defaultClientId={m ? m.clientId : undefined} />
           <Field label="Categoria"><select name="categoryId" defaultValue={m?.categoryId ?? ''} className="input"><option value="">Selecione</option>{data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>

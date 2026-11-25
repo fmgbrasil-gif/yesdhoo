@@ -5,7 +5,7 @@ import { requireUser, screenScope, type SessionUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { bool, num, parseJson, str, youtubeId } from '@/lib/util';
 import { isRemoteKey, isUpload, probe, removeFile, saveFile, videoThumb } from '@/lib/storage';
-import { MEDIA_TYPES } from '@/lib/constants';
+import { MEDIA_TYPES, LIBRARY_SECTIONS } from '@/lib/constants';
 import type { ActionResult } from '@/components/ui';
 
 /** Marca as telas que exibem a midia (direto ou via grupo) para sincronizar de novo. */
@@ -33,7 +33,9 @@ async function syncScreens(user: SessionUser, target: { mediaId: string } | { gr
 export async function saveMedia(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireUser();
   const id = str(fd, 'id');
-  const current = id ? await db.media.findFirst({ where: { id, tenantId: user.tenantId } }) : null;
+  // conteudo da biblioteca (Conteudos dinamicos): global, so o dono da plataforma cadastra
+  const lib = user.superAdmin && LIBRARY_SECTIONS[String(fd.get('library') ?? '')] ? String(fd.get('library')) : null;
+  const current = id ? await db.media.findFirst({ where: { id, OR: [{ tenantId: user.tenantId }, ...(user.superAdmin ? [{ tenantId: null }] : [])] } }) : null;
   if (id && !current) return { error: 'Mídia não encontrada.' };
   const type = current?.type ?? String(fd.get('type'));
   if (!MEDIA_TYPES[type]) return { error: 'Tipo de mídia inválido.' };
@@ -111,9 +113,10 @@ export async function saveMedia(_: ActionResult, fd: FormData): Promise<ActionRe
   data.config = JSON.stringify(cfg);
   data.duration = Math.max(3, Math.min(3600, duration ?? current?.duration ?? 15));
 
+  if (lib) { data.library = lib; data.clientId = null; data.storeStats = false; }
   const media = current
     ? await db.media.update({ where: { id: current.id }, data })
-    : await db.media.create({ data: { ...(data as { name: string }), type, tenantId: user.tenantId } });
+    : await db.media.create({ data: { ...(data as { name: string }), type, tenantId: lib ? null : user.tenantId } });
   if (fd.has('hasScreens')) await syncScreens(user, { mediaId: media.id }, fd.getAll('screens').map(String));
   await bumpScreens(media.id);
   revalidatePath('/', 'layout');
@@ -143,7 +146,7 @@ export async function toggleMedia(_: ActionResult, fd: FormData): Promise<Action
 
 export async function deleteMedia(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const user = await requireUser();
-  const m = await db.media.findFirst({ where: { id: String(fd.get('id')), tenantId: user.tenantId } });
+  const m = await db.media.findFirst({ where: { id: String(fd.get('id')), OR: [{ tenantId: user.tenantId }, ...(user.superAdmin ? [{ tenantId: null }] : [])] } });
   if (!m) return { error: 'Mídia não encontrada.' };
   await bumpScreens(m.id);
   await db.media.delete({ where: { id: m.id } });
