@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { SEGMENTS } from '../src/lib/constants';
 import { migrateLegacyFees } from '../src/lib/billing';
+import { ensureLibraryVideos } from '../src/lib/library-videos';
 
 const db = new PrismaClient();
 const day = (offset: number) => new Date(Date.now() - offset * 86400_000).toISOString().slice(0, 10);
@@ -30,6 +31,8 @@ async function main() {
       if (!t.slug) await db.tenant.update({ where: { id: t.id }, data: { slug: t.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'principal' } });
       console.log(`Dono da plataforma: ${owner.email}`);
     }
+    const videos = await ensureLibraryVideos(db);
+    if (videos) console.log(`${videos} vídeo(s) novo(s) nos Conteúdos dinâmicos.`);
     const migrated = await migrateLegacyFees();
     if (migrated) console.log(`${migrated} mensalidade(s) antiga(s) convertida(s) em cobrança recorrente.`);
     console.log('Banco já possui dados — seed ignorado.');
