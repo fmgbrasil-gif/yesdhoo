@@ -63,6 +63,7 @@ export async function saveFolder(_: ActionResult, fd: FormData): Promise<ActionR
       },
       specs: { show: on(fd, 'specs_show') },
       clients: { show: on(fd, 'clients_show'), title: s(fd, 'clients_title'), logos: [...keep, ...added] },
+      proposalPages: old.proposalPages,
       contact: { title: s(fd, 'contact_title'), text: s(fd, 'contact_text'), phone: s(fd, 'contact_phone'), whatsapp: s(fd, 'contact_whatsapp'), email: s(fd, 'contact_email'), instagram: s(fd, 'contact_instagram'), site: s(fd, 'contact_site'), address: s(fd, 'contact_address') },
     };
     await db.tenant.update({ where: { id: user.tenantId }, data: { folder: JSON.stringify(cfg) } });
@@ -78,7 +79,7 @@ export async function resetFolderTexts(): Promise<ActionResult> {
   const user = await requireAdmin();
   const old = folderConfig(user.tenant.folder);
   const def = folderConfig('{}');
-  def.cover.image = old.cover.image; def.cover.logo = old.cover.logo; def.about.image = old.about.image; def.clients.logos = old.clients.logos; def.gallery.photos = old.gallery.photos;
+  def.cover.image = old.cover.image; def.cover.logo = old.cover.logo; def.about.image = old.about.image; def.clients.logos = old.clients.logos; def.gallery.photos = old.gallery.photos; def.proposalPages = old.proposalPages;
   await db.tenant.update({ where: { id: user.tenantId }, data: { folder: JSON.stringify(def) } });
   revalidatePath('/folder');
   return { ok: true, message: 'Textos e cores voltaram ao padrão.' };

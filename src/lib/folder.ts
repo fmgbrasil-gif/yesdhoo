@@ -17,6 +17,8 @@ export type FolderConfig = {
   specs: { show: boolean };
   clients: { show: boolean; title: string; logos: string[] };
   contact: { title: string; text: string; phone: string; whatsapp: string; email: string; instagram: string; site: string; address: string };
+  /** paginas (imagens A4) anexadas ao fim das propostas comerciais */
+  proposalPages: string[];
 };
 
 export const FOLDER_DEFAULT: FolderConfig = {
@@ -51,6 +53,7 @@ export const FOLDER_DEFAULT: FolderConfig = {
   },
   specs: { show: true },
   clients: { show: true, title: 'Marcas que confiam', logos: [] },
+  proposalPages: ['/proposta/folder-1.jpg', '/proposta/folder-2.jpg', '/proposta/folder-3.jpg', '/proposta/folder-4.jpg'],
   contact: { title: 'Vamos conversar?', text: 'Fale com a gente e monte o plano ideal para a sua marca.', phone: '', whatsapp: '', email: '', instagram: '', site: '', address: '' },
 };
 
@@ -69,6 +72,7 @@ export function folderConfig(raw: string | null | undefined): FolderConfig {
     points: merge(d.points, v.points),
     plans: { ...merge(d.plans, v.plans), items: list(d.plans.items, v.plans?.items, (x) => x) },
     specs: merge(d.specs, v.specs), clients: { ...merge(d.clients, v.clients), logos: v.clients?.logos ?? [] }, contact: merge(d.contact, v.contact),
+    proposalPages: Array.isArray(v.proposalPages) ? v.proposalPages : d.proposalPages,
   };
 }
 

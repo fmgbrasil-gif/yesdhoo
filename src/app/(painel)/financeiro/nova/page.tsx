@@ -9,7 +9,8 @@ import { screenOptions } from '@/lib/operations';
 // a leitura dos documentos do cliente com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
 
-export default async function NovaCobrancaPage() {
+export default async function NovaCobrancaPage({ searchParams }: { searchParams: Promise<{ cliente?: string; proposta?: string }> }) {
+  const sp = await searchParams;
   const user = await requireAdmin();
   const [clients, services, ops, screens, accounts] = await Promise.all([
     db.client.findMany({ where: { tenantId: user.tenantId, active: true }, orderBy: { name: 'asc' }, select: { id: true, name: true, kind: true } }),
@@ -21,7 +22,7 @@ export default async function NovaCobrancaPage() {
   return (
     <>
       <PageHeader title="Nova cobrança" crumbs={[{ label: 'Financeiro', href: '/financeiro' }, { label: 'Nova cobrança' }]} />
-      <ChargeWizard clients={clients} services={services} operations={ops.map((o) => ({ id: o.id, name: o.name, accountId: o.accountId, screenIds: o.screens.map((s) => s.id) }))} accounts={accounts} screens={screens} today={localDate()} hasAi={!!openaiKey(user.tenant)} />
+      <ChargeWizard clients={clients} services={services} operations={ops.map((o) => ({ id: o.id, name: o.name, accountId: o.accountId, screenIds: o.screens.map((s) => s.id) }))} accounts={accounts} screens={screens} today={localDate()} hasAi={!!openaiKey(user.tenant)} initialClientId={sp.cliente} fromProposal={sp.proposta} />
     </>
   );
 }

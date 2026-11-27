@@ -55,6 +55,7 @@ model Tenant {
   invoices   Invoice[]
   subscriptions Subscription[]
   contracts  Contract[]
+  proposals  Proposal[]
   services   Service[]
   operations Operation[]
   bankAccounts BankAccount[]
@@ -148,6 +149,7 @@ model Client {
   invoices     Invoice[]
   subscriptions Subscription[]
   contracts    Contract[]
+  proposals    Proposal[]
 }
 
 // Cobranca que gera faturas mes a mes: por periodo (N meses, todas geradas de uma vez) ou recorrente (ate cancelar).
@@ -569,4 +571,52 @@ model SigningKey {
   notes        String   @default("")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+/// Proposta comercial para um cliente pretendido (antes do contrato): link publico com aceite e assinatura.
+model Proposal {
+  id           String    @id @default(uuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  number       Int
+  status       String    @default("rascunho") // rascunho | enviada | aceita | recusada
+  // cliente pretendido
+  clientId     String?   // cliente criado/ligado ao aceitar
+  client       Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  companyName  String
+  tradeName    String?
+  document     String?
+  contactName  String?
+  phone        String?
+  email        String?
+  instagram    String?
+  segment      String?
+  city         String?
+  logo         String?
+  objective    String    @default("") // texto do cartao "preparada especialmente para"
+  // oferta
+  region       String    @default("") // ex.: IGARAPAVA / SP
+  points       Int?
+  screens      Int?
+  dailyPlays   Int?
+  benefits     String    @default("[]") // JSON: lista "o que a sua empresa recebe"
+  monthlyCents Int       @default(0)
+  priceNote    String    @default("")
+  conditions   String    @default("")
+  validUntil   String?   // YYYY-MM-DD
+  showFolder   Boolean   @default(true)
+  // aceite
+  publicToken  String    @unique
+  sentAt       DateTime?
+  viewedAt     DateTime?
+  acceptedAt   DateTime?
+  signerName   String?
+  signerDoc    String?
+  signature    String?
+  signerIp     String?
+  refusedAt    DateTime?
+  refuseReason String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  @@index([tenantId, status])
 }

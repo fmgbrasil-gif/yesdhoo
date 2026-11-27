@@ -7,7 +7,7 @@ import { refuseContract, signContract } from '@/app/contrato/[token]/actions';
 import type { PdfSignature } from '@/lib/pdf-client';
 
 /** Campo para o cliente desenhar a rubrica com o dedo ou o mouse. */
-function SignaturePad({ onChange }: { onChange: (dataUrl: string) => void }) {
+export function SignaturePad({ onChange }: { onChange: (dataUrl: string) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const strokes = useRef(0);

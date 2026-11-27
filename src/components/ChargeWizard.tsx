@@ -73,11 +73,13 @@ function ClientFields({ d }: { d: Partial<ClientDraft> }) {
  * Nova cobranca em etapas: cliente (cadastro lido dos documentos) -> cobranca -> contrato basico da operacao
  * -> fatura com Pix -> envio (WhatsApp, e-mail ou PDFs) do que estiver marcado.
  */
-export function ChargeWizard({ clients, services, operations: initialOps, screens, today, hasAi, accounts = [] }: {
+export function ChargeWizard({ clients, services, operations: initialOps, screens, today, hasAi, accounts = [], initialClientId, fromProposal }: {
   clients: Opt[]; services: ServiceOpt[]; operations: OperationOpt[]; screens: ScreenOpt[]; today: string; hasAi: boolean; accounts?: AccountOpt[];
+  /** vindo de uma proposta aceita: ja comeca com o cliente escolhido, na etapa Cobranca */ initialClientId?: string; fromProposal?: string;
 }) {
-  const [step, setStep] = useState(0);
-  const [maxStep, setMaxStep] = useState(0);
+  const start = initialClientId ? clients.find((c) => c.id === initialClientId) ?? null : null;
+  const [step, setStep] = useState(start ? 1 : 0);
+  const [maxStep, setMaxStep] = useState(start ? 1 : 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // etapa 1
@@ -85,8 +87,8 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   const [draft, setDraft] = useState<Partial<ClientDraft> | null>(null);
   const [draftKey, setDraftKey] = useState(0);
   const [docNotes, setDocNotes] = useState<string[]>([]);
-  const [client, setClient] = useState<WizardClient | null>(null);
-  const [newClient, setNewClient] = useState(false); // cadastrado agora: contrato obrigatorio
+  const [client, setClient] = useState<WizardClient | null>(start ? { id: start.id, name: start.name, kind: start.kind } : null);
+  const [newClient, setNewClient] = useState(!!start); // cadastrado agora (ou vindo de proposta): contrato obrigatorio
   // etapas 2 a 5
   const [charge, setCharge] = useState<Charge | null>(null);
   const [ops, setOps] = useState(initialOps);
@@ -217,6 +219,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
   return (
     <div className="card p-5 sm:p-6">
       <Stepper step={step} max={maxStep} onGo={go} />
+      {fromProposal && <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Proposta <b>{fromProposal}</b> aceita pelo cliente. O cadastro já foi criado: agora é só lançar a cobrança e gerar o contrato.</p>}
       {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-200" role="alert">{error}</p>}
 
       {step === 0 && charge && client && (
