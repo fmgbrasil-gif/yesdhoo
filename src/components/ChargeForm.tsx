@@ -31,7 +31,7 @@ export function OperationAccountFields({ operations = [], accounts = [], operati
           <select name="operationId" value={op} className="input" onChange={(e) => {
             const o = operations.find((x) => x.id === e.target.value) ?? null;
             setOp(e.target.value);
-            if (o?.accountId && accounts.some((a) => a.id === o.accountId)) setAcc(o.accountId);
+            setAcc(o?.accountId && accounts.some((a) => a.id === o.accountId) ? o.accountId : fallback); // operacao sem caixa proprio: volta ao caixa padrao
             onOperation?.(o);
           }}>
             <option value="">Sem operação</option>
