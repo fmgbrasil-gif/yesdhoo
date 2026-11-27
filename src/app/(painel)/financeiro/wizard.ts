@@ -51,12 +51,16 @@ export async function wizardSaveClient(fd: FormData): Promise<Fail | { ok: true;
 }
 
 /** Etapa 2: cria a cobranca (avulsa ja cria a fatura). */
-export async function wizardCharge(fd: FormData): Promise<Fail | { ok: true; invoiceId: string | null; subscriptionId: string | null; clientId: string; message: string }> {
+export async function wizardCharge(fd: FormData): Promise<Fail | { ok: true; invoiceId: string | null; subscriptionId: string | null; clientId: string; message: string; operationId: string | null }> {
   const user = await requireAdmin();
   const r = await chargeFromForm(user, fd);
   if ('error' in r) return { ok: false, error: r.error };
   revalidatePath('/financeiro');
-  return { ok: true, ...r };
+  // operacao gravada na cobranca: ja vem escolhida na etapa do contrato
+  const saved = r.subscriptionId
+    ? await db.subscription.findUnique({ where: { id: r.subscriptionId }, select: { operationId: true } })
+    : r.invoiceId ? await db.invoice.findUnique({ where: { id: r.invoiceId }, select: { operationId: true } }) : null;
+  return { ok: true, ...r, operationId: saved?.operationId ?? (String(fd.get('operationId') ?? '') || null) };
 }
 
 /** Etapa 3: contrato basico no padrao da empresa, com os pontos da operacao escolhida. */

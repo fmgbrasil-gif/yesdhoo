@@ -142,7 +142,7 @@ export function ChargeWizard({ clients, services, operations: initialOps, screen
     const chosenOp = String(fd.get('operationId') ?? '');
     run(async () => {
       const r = await wizardCharge(fd);
-      if (r.ok && chosenOp) setOpId(chosenOp); // ja vem marcada na etapa do contrato
+      if (r.ok && (r.operationId || chosenOp)) setOpId(r.operationId || chosenOp); // ja vem marcada na etapa do contrato
       if (!r.ok) { setError(r.error); return; }
       setCharge(r); if (r.invoiceId && !r.subscriptionId) setInvoiceId(r.invoiceId); go(2);
     });
