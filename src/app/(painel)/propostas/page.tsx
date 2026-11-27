@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FileImage, Plus } from 'lucide-react';
+import { FileImage, Plus, Trash2 } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { fmtMoney } from '@/lib/money';
@@ -8,9 +8,9 @@ import { fileUrl } from '@/lib/storage';
 import { folderConfig } from '@/lib/folder';
 import { PROPOSAL_STATUS } from '@/lib/proposal';
 import { Empty, PageHeader } from '@/components/basic';
-import { ActionForm, Field, Modal } from '@/components/ui';
+import { ActionForm, Confirm, Field, Modal } from '@/components/ui';
 import { PhotoInput } from '@/components/PhotoInput';
-import { saveProposalPages } from './actions';
+import { deleteProposal, saveProposalPages } from './actions';
 import { SalesAssistant } from '@/components/SalesAssistant';
 import { openaiKey } from '@/lib/ai-contract';
 
@@ -63,7 +63,9 @@ export default async function PropostasPage({ searchParams }: { searchParams: Pr
                     <td className="td text-right font-semibold tabular-nums">{fmtMoney(p.monthlyCents)}</td>
                     <td className="td"><span className={`badge ${PROPOSAL_STATUS[p.status]?.cls}`}>{PROPOSAL_STATUS[p.status]?.label}</span>{p.viewedAt && p.status === 'enviada' && <span className="block text-xs text-ink-400">vista {timeAgo(p.viewedAt)}</span>}</td>
                     <td className="td text-ink-500">{timeAgo(p.createdAt)}</td>
-                    <td className="td text-right"><Link href={`/propostas/${p.id}`} className="btn-ghost !py-1.5">Abrir</Link></td>
+                    <td className="td"><span className="flex justify-end gap-1.5"><Link href={`/propostas/${p.id}`} className="btn-ghost !py-1.5">Abrir</Link>
+                      <Confirm trigger={<Trash2 size={15} />} triggerClass="btn-icon !text-red-600" titleAttr="Excluir proposta" title={`Excluir a proposta nº ${p.number} (${p.tradeName || p.companyName})?`} confirmLabel="Excluir" action={deleteProposal} fields={{ id: p.id }}
+                        text={p.status === 'aceita' ? 'Esta proposta já foi ACEITA e assinada pelo cliente: o registro do aceite será apagado. O cadastro do cliente e as cobranças continuam. O link enviado deixa de funcionar.' : 'O link enviado ao cliente deixa de funcionar. Esta operação não pode ser desfeita.'} /></span></td>
                   </tr>
                 ))}
               </tbody>

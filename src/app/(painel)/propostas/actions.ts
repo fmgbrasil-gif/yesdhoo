@@ -57,7 +57,6 @@ export async function deleteProposal(_: ActionResult, fd: FormData): Promise<Act
   const user = await requireAdmin();
   const p = await db.proposal.findFirst({ where: { id: s(fd, 'id'), tenantId: user.tenantId } });
   if (!p) return { error: 'Proposta não encontrada.' };
-  if (p.status === 'aceita') return { error: 'Proposta aceita não pode ser excluída (é o registro do aceite do cliente).' };
   await db.proposal.delete({ where: { id: p.id } });
   if (p.logo && !(await db.client.count({ where: { image: p.logo } }))) await removeFile(p.logo);
   revalidatePath('/propostas');

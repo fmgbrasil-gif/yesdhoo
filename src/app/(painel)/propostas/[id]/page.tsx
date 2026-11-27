@@ -66,7 +66,7 @@ export default async function PropostaPage({ params }: { params: Promise<{ id: s
           </Modal>
         )}
         <ActionButton action={duplicateProposal} fields={{ id: p.id }} className="btn-ghost" title="Criar uma cópia desta proposta"><CopyIcon size={16} /> Duplicar</ActionButton>
-        {!ok && <Confirm trigger={<><Trash2 size={16} /> Excluir</>} triggerClass="btn-ghost !text-red-600" title="Excluir esta proposta?" text="O link enviado ao cliente deixa de funcionar." action={deleteProposal} fields={{ id: p.id }} confirmLabel="Excluir" />}
+        <Confirm trigger={<><Trash2 size={16} /> Excluir</>} triggerClass="btn-ghost !text-red-600" title="Excluir esta proposta?" text={ok ? 'Esta proposta já foi ACEITA e assinada: o registro do aceite será apagado. O cadastro do cliente e as cobranças continuam.' : 'O link enviado ao cliente deixa de funcionar.'} action={deleteProposal} fields={{ id: p.id }} confirmLabel="Excluir" />
       </div>
 
       <div className="overflow-x-auto rounded-xl bg-[#ece8f4] p-4"><ProposalView p={p} tenant={user.tenant} pages={folderConfig(user.tenant.folder).proposalPages} /></div>
