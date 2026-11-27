@@ -5,13 +5,14 @@ import { ActionForm } from '@/components/ui';
 import { ProposalFields } from '@/components/ProposalForm';
 import { saveProposal } from '../actions';
 import { openaiKey } from '@/lib/ai-contract';
+import { SalesAssistant } from '@/components/SalesAssistant';
 
 export default async function NovaPropostaPage() {
   const user = await requireAdmin();
   const net = await networkStats(user.tenantId);
   return (
     <>
-      <PageHeader title="Nova proposta" crumbs={[{ label: 'Propostas', href: '/propostas' }, { label: 'Nova' }]} />
+      <PageHeader title="Nova proposta" crumbs={[{ label: 'Propostas', href: '/propostas' }, { label: 'Nova' }]}><SalesAssistant hasAi={!!openaiKey(user.tenant)} /></PageHeader>
       <div className="card max-w-3xl p-5"><ActionForm action={saveProposal} submit="Criar proposta"><ProposalFields net={net} hasAi={!!openaiKey(user.tenant)} /></ActionForm></div>
     </>
   );

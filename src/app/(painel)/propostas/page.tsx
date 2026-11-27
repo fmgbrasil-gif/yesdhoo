@@ -11,6 +11,8 @@ import { Empty, PageHeader } from '@/components/basic';
 import { ActionForm, Field, Modal } from '@/components/ui';
 import { PhotoInput } from '@/components/PhotoInput';
 import { saveProposalPages } from './actions';
+import { SalesAssistant } from '@/components/SalesAssistant';
+import { openaiKey } from '@/lib/ai-contract';
 
 export default async function PropostasPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const sp = await searchParams;
@@ -40,6 +42,7 @@ export default async function PropostasPage({ searchParams }: { searchParams: Pr
             <Field label="Acrescentar páginas" hint="Imagens JPG/PNG em pé (A4). Exporte cada página do PDF como imagem."><PhotoInput name="pages" max={8} size={1500} /></Field>
           </ActionForm>
         </Modal>
+        <SalesAssistant hasAi={!!openaiKey(user.tenant)} />
         <Link href="/propostas/nova" className="btn-primary"><Plus size={16} /> Nova proposta</Link>
       </PageHeader>
       <p className="mb-4 max-w-3xl text-sm text-ink-500">Monte a proposta do cliente pretendido, envie pelo WhatsApp e acompanhe. Quando o cliente <b>aceita e assina</b>, a proposta fica <b className="text-emerald-600">verde</b>, o cadastro dele é criado e libera o botão <b>Seguir para cobrança e contrato</b>.</p>

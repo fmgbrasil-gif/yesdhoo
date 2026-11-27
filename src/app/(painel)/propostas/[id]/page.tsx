@@ -14,6 +14,8 @@ import { ProposalFields } from '@/components/ProposalForm';
 import { ProposalView } from '@/components/ProposalView';
 import { ProposalSend } from '@/components/ProposalSend';
 import { deleteProposal, duplicateProposal, saveProposal } from '../actions';
+import { SalesAssistant } from '@/components/SalesAssistant';
+import { openaiKey } from '@/lib/ai-contract';
 
 const waPhone = (p: string | null) => { const d = (p ?? '').replace(/\D/g, ''); return d.length >= 10 ? (d.startsWith('55') && d.length >= 12 ? d : `55${d}`) : null; };
 
@@ -54,6 +56,7 @@ export default async function PropostaPage({ params }: { params: Promise<{ id: s
       )}
 
       <div className="mb-6 flex flex-wrap gap-2">
+        <SalesAssistant proposalId={p.id} phone={waPhone(p.phone)} client={who} hasAi={!!openaiKey(user.tenant)} />
         {!ok && <ProposalSend id={p.id} url={url} phone={waPhone(p.phone)} text={text} />}
         <a href={url} target="_blank" rel="noreferrer" className="btn-ghost"><ExternalLink size={16} /> Abrir como o cliente vê</a>
         <Link href={p.clientId ? `/financeiro/nova?cliente=${p.clientId}&proposta=${encodeURIComponent(`nº ${p.number} · ${who}`)}` : '/financeiro/nova'} className="btn-ghost" title={p.clientId ? 'Abre a Nova cobrança com este cliente já escolhido' : 'Abre a Nova cobrança (o cliente ainda não aceitou: cadastre-o por lá)'}><Wallet size={16} /> Gerar nova cobrança</Link>
