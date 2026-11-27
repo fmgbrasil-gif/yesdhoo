@@ -83,6 +83,15 @@ export async function updateScreen(_: ActionResult, fd: FormData): Promise<Actio
   return { ok: true };
 }
 
+/** Giro rapido da imagem no aparelho (TV pendurada de lado ou de cabeca para baixo). Chega na tela em ate 20 s. */
+export async function setRotation(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  const screen = await ownScreen(await requireUser(), String(fd.get('id')));
+  const rotation = ['0', '90', '180', '270'].includes(String(fd.get('rotation'))) ? String(fd.get('rotation')) : 'auto';
+  await db.screen.update({ where: { id: screen.id }, data: { rotation, playlistVersion: { increment: 1 } } });
+  revalidatePath(`/telas/${screen.id}`, 'layout');
+  return { ok: true, message: 'Posição salva: a TV muda em até 20 segundos.' };
+}
+
 export async function toggleFavorite(_: ActionResult, fd: FormData): Promise<ActionResult> {
   const screen = await ownScreen(await requireUser(), String(fd.get('id')));
   await db.screen.update({ where: { id: screen.id }, data: { favorite: !screen.favorite } });

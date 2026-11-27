@@ -1,8 +1,9 @@
 import type { Category, Screen } from '@prisma/client';
 import Link from 'next/link';
-import { Calculator, FileText, HardDriveDownload, MapPin, Monitor, Pencil, RotateCcw, Star, Trash2 } from 'lucide-react';
+import { Calculator, FileText, RotateCw, HardDriveDownload, MapPin, Monitor, Pencil, RotateCcw, Star, Trash2 } from 'lucide-react';
 import { screenPlaylist } from '@/lib/screen-playlist';
 import { ScreenCalculator } from './ScreenCalculator';
+import { RotationPicker } from './RotationPicker';
 import { MediaDownloads } from './MediaDownloads';
 import { Avatar, StatusDot } from './basic';
 import { ActionButton, ActionForm, Confirm, Modal } from './ui';
@@ -48,6 +49,9 @@ export async function ScreenHeader({ screen, categories, clients }: { screen: Sc
             ? <MapView points={[{ name: screen.name, lat: screen.latitude, lng: screen.longitude, online: on }]} height={320} />
             : <p className="text-sm text-ink-400">Localização não definida. Use Editar → Localização.</p>}
           <p className="mt-3 text-sm text-ink-500">{address || 'Endereço não informado'}</p>
+        </Modal>
+        <Modal trigger={<RotateCw size={16} />} triggerClass="btn-icon" title={`Girar a imagem — ${screen.name}`} titleAttr="Girar imagem" wide>
+          <RotationPicker id={screen.id} value={screen.rotation} vertical={screen.orientation === 'V'} />
         </Modal>
         <Modal trigger={<Calculator size={16} />} triggerClass="btn-icon" title={`Calculadora de exibições — ${screen.name}`} titleAttr="Calculadora" wide>
           <ScreenCalculator rows={rows} workStart={screen.workStart} workEnd={screen.workEnd} days={weekDays} />
