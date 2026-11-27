@@ -13,6 +13,19 @@ const brl = (c: number) => (c / 100).toLocaleString('pt-BR', { style: 'currency'
 const empty = (): Row => ({ description: '', unit: 'mês', quantity: '1', unit_price: '0,00' });
 
 /** Linhas da fatura (descricao, unidade, quantidade, valor) com total ao vivo e atalho para o catalogo de servicos. */
+const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+/** Servico mais parecido com a descricao: igual > mais palavras da operacao em comum > o servico geral (nome mais curto). */
+function matchService(list: ServiceOpt[], text: string) {
+  const usable = list.filter((s) => s.priceCents > 0);
+  if (!usable.length) return null;
+  const t = norm(text);
+  const exact = usable.find((s) => norm(s.name) === t);
+  if (exact) return exact;
+  const op = norm(text.split('—').slice(1).join(' ')).split(' ').filter((w) => w.length > 2 && !['yes', 'full', 'service'].includes(w));
+  const score = (s: ServiceOpt) => op.filter((w) => norm(s.name).includes(w)).length;
+  return [...usable].sort((a, b) => score(b) - score(a) || a.name.length - b.name.length)[0];
+}
+
 export function InvoiceItems({ initial, services: initialServices = [], suggest, extraSuggestions = [] }: {
   initial?: { description: string; unit?: string; quantity: number; unitCents: number }[]; services?: ServiceOpt[];
   /** descricao sugerida (ex.: ao escolher a operacao); so preenche a 1a linha se estiver vazia ou com a sugestao anterior */
@@ -24,13 +37,23 @@ export function InvoiceItems({ initial, services: initialServices = [], suggest,
     ? initial.map((i) => ({ description: i.description, unit: i.unit ?? 'un', quantity: String(i.quantity).replace('.', ','), unit_price: centsToText(i.unitCents) }))
     : [empty()]);
   const [services, setServices] = useState(initialServices);
+  const [lastPrice, setLastPrice] = useState('');
   const [picker, setPicker] = useState(false);
   const [draft, setDraft] = useState({ name: '', unit: 'mês', price: '0,00' });
   const [msg, setMsg] = useState('');
   const [lastSuggest, setLastSuggest] = useState('');
   useEffect(() => {
     if (!suggest) return;
-    setRows((rs) => (rs[0] && (!rs[0].description || rs[0].description === lastSuggest) ? [{ ...rs[0], description: suggest }, ...rs.slice(1)] : rs));
+    // descricao sugerida pela operacao: puxa tambem o valor (e a unidade) do servico cadastrado mais parecido
+    const svc = matchService(services, suggest);
+    setRows((rs) => {
+      const r = rs[0];
+      if (!r || (r.description && r.description !== lastSuggest)) return rs;
+      const autoPrice = cents(r.unit_price) === 0 || r.unit_price === lastPrice;
+      const priced = svc && autoPrice ? { unit: svc.unit, unit_price: centsToText(svc.priceCents) } : {};
+      if (svc && autoPrice) setLastPrice(centsToText(svc.priceCents));
+      return [{ ...r, description: suggest, ...priced }, ...rs.slice(1)];
+    });
     setLastSuggest(suggest);
   }, [suggest]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (i: number, k: keyof Row, v: string) => setRows(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
