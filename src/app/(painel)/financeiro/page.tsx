@@ -18,6 +18,7 @@ import { opDescription } from '@/lib/op-text';
 import { PeriodBar } from '@/components/PeriodBar';
 import { periodHref, resolvePeriod } from '@/lib/period';
 import { kindLabel } from '@/lib/client-kind';
+import { OperationBadge } from '@/components/OperationBadge';
 
 // a geracao de contrato com IA pode levar ate ~2 minutos
 export const maxDuration = 300;
@@ -68,7 +69,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
   ]);
   const subs = await db.subscription.findMany({
     where: { tenantId: tid }, orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-    include: { client: { select: { name: true, kind: true, active: true } }, invoices: { select: { status: true, dueDate: true } } },
+    include: { client: { select: { name: true, kind: true, active: true } }, operation: { select: { name: true } }, invoices: { select: { status: true, dueDate: true } } },
   });
   const services = (await db.service.findMany({ where: { tenantId: tid }, orderBy: { name: 'asc' } })).map((x) => ({ id: x.id, name: x.name, unit: x.unit, priceCents: x.priceCents }));
   const contracts = tab === 'contratos' ? await db.contract.findMany({ where: { tenantId: tid }, orderBy: { createdAt: 'desc' }, include: { client: { select: { name: true } } } }) : [];
@@ -113,7 +114,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                     const late = s.invoices.filter((i) => i.status === 'aberta' && i.dueDate < today).length;
                     return (
                       <tr key={s.id} className={s.status === 'ativa' ? '' : 'opacity-60'}>
-                        <td className="td"><span className="block font-semibold">{s.client.name}</span><span className="text-xs text-ink-400">{kindLabel(s.client.kind)}{!s.client.active && ' · desativado'}</span></td>
+                        <td className="td"><span className="flex flex-wrap items-center gap-2"><span className="font-semibold">{s.client.name}</span><OperationBadge name={s.operation?.name} /></span><span className="text-xs text-ink-400">{kindLabel(s.client.kind)}{!s.client.active && ' · desativado'}</span></td>
                         <td className="td"><span className="inline-flex items-center gap-1">{s.mode === 'recorrente' && <Repeat size={13} />}{SUB_MODE(s)}</span><span className="block text-xs text-ink-400">desde {competenceLabel(s.startMonth)}</span></td>
                         <td className="td text-right font-semibold tabular-nums">{fmtMoney(s.amountCents)}</td>
                         <td className="td">dia {s.dueDay}</td>
@@ -191,7 +192,7 @@ export default async function FinanceiroPage({ searchParams }: { searchParams: P
                   return (
                     <tr key={inv.id}>
                       <td className="td font-mono text-ink-500">{String(inv.number).padStart(5, '0')}</td>
-                      <td className="td"><span className="block font-semibold">{inv.client.name}</span><span className="text-xs text-ink-400">{kindLabel(inv.client.kind)}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}{inv.operation ? ` · ${inv.operation.name}` : ''}</span></td>
+                      <td className="td"><span className="flex flex-wrap items-center gap-2"><span className="font-semibold">{inv.client.name}</span><OperationBadge name={inv.operation?.name} /></span><span className="text-xs text-ink-400">{kindLabel(inv.client.kind)}{inv.installment ? ` · parcela ${inv.installment}` : inv.subscriptionId ? ` · recorrente ${inv.competence?.split('-').reverse().join('/')}` : ''}</span></td>
                       <td className="td tabular-nums">{fmtDate(inv.dueDate)}</td>
                       <td className="td text-right font-semibold tabular-nums">{fmtMoney(inv.amountCents)}</td>
                       <td className="td">

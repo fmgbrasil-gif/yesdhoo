@@ -14,6 +14,7 @@ import { localDate } from '@/lib/util';
 import { PeriodBar } from '@/components/PeriodBar';
 import { periodHref, resolvePeriod } from '@/lib/period';
 import { invoicePeriod, SITUACOES } from '@/lib/receivables';
+import { OperationBadge } from '@/components/OperationBadge';
 
 export const metadata = { title: 'Contas a receber' };
 
@@ -115,7 +116,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
                   <summary className="flex cursor-pointer flex-wrap items-center gap-3 bg-brand-50 p-4 hover:bg-brand-100 dark:bg-ink-900 dark:hover:bg-ink-700/40">
                     <ChevronDown size={16} className="shrink-0 -rotate-90 text-ink-400 transition-transform group-open:rotate-0" aria-hidden />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold">{g.client.tradeName || g.client.name}</span>
+                      <span className="flex flex-wrap items-center gap-2"><span className="font-semibold">{g.client.tradeName || g.client.name}</span>{[...new Set(g.items.map((i) => i.operation))].map((o) => <OperationBadge key={o ?? '-'} name={o} />)}</span>
                       <span className="text-xs text-ink-400">{[fmtDoc(g.client.document), g.client.phone1, `${g.items.length} fatura(s)`].filter(Boolean).join(' · ')}</span>
                     </span>
                     {g.maxLate > 0 && <span className="badge bg-red-100 text-red-700">{g.maxLate} dia(s) de atraso</span>}
@@ -131,7 +132,7 @@ export default async function ReceberPage({ searchParams }: { searchParams: Prom
                       {g.items.map((i) => (
                         <tr key={i.id} className="border-t border-ink-100 dark:border-ink-700">
                           <td className="td pl-8 font-mono">{String(i.number).padStart(6, '0')}</td>
-                          <td className="td">{i.ref}{i.operation && <span className="block text-xs text-ink-400">{i.operation}</span>}</td>
+                          <td className="td">{i.ref}<span className="mt-0.5 block"><OperationBadge name={i.operation} /></span></td>
                           <td className={`td ${i.late ? 'font-semibold text-red-600' : ''}`}>{fmtDate(i.dueDate)}</td>
                           <td className="td">{i.state === 'paga' ? <span className="badge bg-emerald-100 text-emerald-700">Paga</span> : i.state === 'cancelada' ? <span className="badge bg-ink-100 text-ink-500">Cancelada</span> : i.late ? `${i.late} dia(s)` : '—'}</td>
                           <td className="td text-right font-semibold tabular-nums">{fmtMoney(i.amountCents)}</td>
