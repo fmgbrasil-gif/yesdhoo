@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import { ArrowRight, Copy as CopyIcon, ExternalLink, Pencil, Trash2 } from 'lucide-react';
+import { ArrowRight, Copy as CopyIcon, ExternalLink, Pencil, Trash2, Wallet } from 'lucide-react';
 import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { fmtMoney } from '@/lib/money';
@@ -56,6 +56,7 @@ export default async function PropostaPage({ params }: { params: Promise<{ id: s
       <div className="mb-6 flex flex-wrap gap-2">
         {!ok && <ProposalSend id={p.id} url={url} phone={waPhone(p.phone)} text={text} />}
         <a href={url} target="_blank" rel="noreferrer" className="btn-ghost"><ExternalLink size={16} /> Abrir como o cliente vê</a>
+        <Link href={p.clientId ? `/financeiro/nova?cliente=${p.clientId}&proposta=${encodeURIComponent(`nº ${p.number} · ${who}`)}` : '/financeiro/nova'} className="btn-ghost" title={p.clientId ? 'Abre a Nova cobrança com este cliente já escolhido' : 'Abre a Nova cobrança (o cliente ainda não aceitou: cadastre-o por lá)'}><Wallet size={16} /> Gerar nova cobrança</Link>
         {!ok && (
           <Modal trigger={<><Pencil size={16} /> Editar</>} triggerClass="btn-ghost" title={`Editar proposta nº ${p.number}`} wide>
             <ActionForm action={saveProposal}><ProposalFields p={p} net={net} /></ActionForm>

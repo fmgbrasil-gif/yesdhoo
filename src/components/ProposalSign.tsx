@@ -32,8 +32,8 @@ export function ProposalSign({ token, company }: { token: string; company: strin
             <p className="text-lg font-black text-[#1d1340]">Gostou da proposta?</p>
             <p className="text-sm text-gray-500">Aceite agora com sua assinatura eletrônica. Em seguida enviamos o contrato.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setMode('aceitar')} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white shadow hover:bg-emerald-500"><CheckCircle2 size={18} /> Aceitar proposta</button>
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <button type="button" onClick={() => setMode('aceitar')} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl sm:flex-none bg-emerald-600 px-6 py-3 font-bold text-white shadow hover:bg-emerald-500"><CheckCircle2 size={18} /> Aceitar proposta</button>
             <button type="button" onClick={() => setMode('recusar')} className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 font-bold text-red-600 ring-1 ring-red-200 hover:bg-red-50"><XCircle size={18} /> Recusar</button>
           </div>
         </div>

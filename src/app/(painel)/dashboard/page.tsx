@@ -8,6 +8,8 @@ import { Avatar, Bars } from '@/components/basic';
 import { Notes } from '@/components/Notes';
 import MapView from '@/components/MapLazy';
 import { saveUserNotes } from './actions';
+import { fmtMoney } from '@/lib/money';
+import { timeAgo } from '@/lib/util';
 
 const SEG_COLORS = ['#8a52f8', '#0ea5e9', '#10b981', '#f43f5e', '#8b5cf6', '#f97316', '#14b8a6', '#64748b'];
 const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -49,6 +51,16 @@ export default async function Dashboard() {
   const maxItems = Math.max(1, top[0]?.items.length ?? 1);
   const points = screens.filter((s) => s.latitude != null && s.longitude != null).map((s) => ({ id: s.id, name: s.name, lat: s.latitude!, lng: s.longitude!, online: isOnline(s.lastSeenAt) }));
   const plan = user.tenant.planScreens;
+  // propostas comerciais (so administradores veem)
+  const isAdmin = user.role === 'admin';
+  const [propCounts, waiting] = isAdmin ? await Promise.all([
+    db.proposal.groupBy({ by: ['status'], where: { tenantId: user.tenantId }, _count: true, _sum: { monthlyCents: true } }),
+    db.proposal.findMany({ where: { tenantId: user.tenantId, status: 'enviada' }, orderBy: { sentAt: 'asc' }, take: 5 }),
+  ]) : [[], []];
+  const pc = Object.fromEntries(propCounts.map((c) => [c.status, c._count]));
+  const accepted = propCounts.find((c) => c.status === 'aceita')?._sum.monthlyCents ?? 0;
+  const sentTotal = (pc.enviada ?? 0) + (pc.aceita ?? 0) + (pc.recusada ?? 0);
+  const conversion = sentTotal ? Math.round(((pc.aceita ?? 0) / sentTotal) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -117,6 +129,47 @@ export default async function Dashboard() {
           </ul>
         </section>
       </div>
+
+      {isAdmin && (
+        <section className="card p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold">Propostas comerciais</h2>
+            <Link href="/propostas/nova" className="text-sm font-semibold text-brand-600 hover:underline">+ Nova proposta</Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            {[
+              ['Enviadas', sentTotal, '', 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-200'],
+              ['Aceitas', pc.aceita ?? 0, 'aceita', 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200'],
+              ['Recusadas', pc.recusada ?? 0, 'recusada', 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200'],
+              ['Sem resposta', pc.enviada ?? 0, 'enviada', 'bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200'],
+              ['Rascunhos', pc.rascunho ?? 0, 'rascunho', 'bg-ink-50 text-ink-600 dark:bg-ink-900 dark:text-ink-300'],
+            ].map(([l, v, k, cls]) => (
+              <Link key={l as string} href={k ? `/propostas?status=${k}` : '/propostas'} className={`rounded-xl p-4 ${cls} hover:opacity-90`}>
+                <p className="text-3xl font-black">{v}</p><p className="text-xs font-semibold uppercase tracking-wide">{l}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
+            <div className="space-y-1 text-sm">
+              <p><span className="text-2xl font-black text-emerald-600">{conversion}%</span> <span className="text-ink-400">de aceite</span></p>
+              <p className="text-ink-500">{fmtMoney(accepted)} <span className="text-ink-400">por mês em propostas aceitas</span></p>
+            </div>
+            <div>
+              <p className="label">Aguardando resposta</p>
+              {waiting.length === 0 ? <p className="text-sm text-ink-400">Nenhuma proposta esperando resposta.</p> : (
+                <ul className="divide-y divide-ink-100 text-sm dark:divide-ink-700">
+                  {waiting.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 py-1.5">
+                      <Link href={`/propostas/${p.id}`} className="min-w-0 truncate font-semibold hover:underline">{p.tradeName || p.companyName}</Link>
+                      <span className="shrink-0 text-xs text-ink-400">{fmtMoney(p.monthlyCents)} · enviada {timeAgo(p.sentAt)} · {p.viewedAt ? <b className="text-sky-600">vista</b> : 'não aberta'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <Notes action={saveUserNotes} defaultValue={user.notes} />
     </div>
